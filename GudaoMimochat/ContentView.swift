@@ -255,8 +255,7 @@ struct ChatView: View {
 struct SettingsView: View {
     @Binding var showSettings: Bool
     @Binding var mimoToken: String
-    @State private var showTokenAlert = false
-    @State private var tempToken = ""
+    @State private var showTokenView = false
     
     var body: some View {
         ZStack {
@@ -298,8 +297,7 @@ struct SettingsView: View {
                     }
                     
                     Button(action: {
-                        tempToken = mimoToken
-                        showTokenAlert = true
+                        showTokenView = true
                     }) {
                         Text("输入mimo的token")
                             .font(.title)
@@ -313,15 +311,69 @@ struct SettingsView: View {
             }
             .background(Color.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .alert("设置token", isPresented: $showTokenAlert) {
-                TextField("请输入token", text: $tempToken)
-                Button("取消", role: .cancel) { }
-                Button("确定") {
-                    mimoToken = tempToken
-                }
-            } message: {
-                Text("请输入您的mimo token")
+            
+            if showTokenView {
+                TokenSettingView(
+                    showTokenView: $showTokenView,
+                    mimoToken: $mimoToken
+                )
             }
+        }
+    }
+}
+
+struct TokenSettingView: View {
+    @Binding var showTokenView: Bool
+    @Binding var mimoToken: String
+    @State private var inputText = ""
+    
+    var body: some View {
+        ZStack {
+            Color.white
+                .edgesIgnoringSafeArea(.all)
+            
+            VStack(spacing: 0) {
+                HStack {
+                    Button(action: {
+                        showTokenView = false
+                    }) {
+                        Image(systemName: "arrow.left")
+                            .font(.title)
+                            .foregroundColor(.black)
+                    }
+                    
+                    Text("设置token")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        mimoToken = inputText
+                        showTokenView = false
+                    }) {
+                        Text("保存")
+                            .font(.title)
+                            .foregroundColor(.black)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 60)
+                .padding(.bottom, 20)
+                
+                TextField("请输入cookie", text: $inputText)
+                    .font(.title)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .border(Color.black, width: 1)
+                    .padding(.horizontal, 20)
+                
+                Spacer()
+            }
+        }
+        .onAppear {
+            inputText = mimoToken
         }
     }
 }
