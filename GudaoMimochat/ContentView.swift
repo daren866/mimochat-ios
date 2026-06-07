@@ -10,12 +10,24 @@ struct ContentView: View {
     @State private var inputText = ""
     @State private var messages: [Message] = []
     @State private var showChat = false
+    @State private var showSettings = false
+    @State private var mimoToken = ""
     
     var body: some View {
         if showChat {
-            ChatView(messages: $messages, inputText: $inputText)
+            ChatView(
+                messages: $messages,
+                inputText: $inputText,
+                showSettings: $showSettings,
+                mimoToken: $mimoToken
+            )
         } else {
-            WelcomeView(inputText: $inputText, onSend: sendMessage)
+            WelcomeView(
+                inputText: $inputText,
+                onSend: sendMessage,
+                showSettings: $showSettings,
+                mimoToken: $mimoToken
+            )
         }
     }
     
@@ -32,6 +44,10 @@ struct ContentView: View {
 struct WelcomeView: View {
     @Binding var inputText: String
     let onSend: () -> Void
+    @Binding var showSettings: Bool
+    @Binding var mimoToken: String
+    @State private var showTokenAlert = false
+    @State private var tempToken = ""
     
     var body: some View {
         ZStack {
@@ -47,7 +63,9 @@ struct WelcomeView: View {
                     
                     Spacer()
                     
-                    Button(action: {}) {
+                    Button(action: {
+                        showSettings = true
+                    }) {
                         Image(systemName: "gear")
                             .font(.title)
                             .foregroundColor(.black)
@@ -90,6 +108,13 @@ struct WelcomeView: View {
                 .border(Color.black, width: 1)
                 .padding(.horizontal, 20)
             }
+            
+            if showSettings {
+                SettingsView(
+                    showSettings: $showSettings,
+                    mimoToken: $mimoToken
+                )
+            }
         }
     }
 }
@@ -97,59 +122,72 @@ struct WelcomeView: View {
 struct ChatView: View {
     @Binding var messages: [Message]
     @Binding var inputText: String
+    @Binding var showSettings: Bool
+    @Binding var mimoToken: String
     
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("MiMo2.5-Pro")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
-                
-                Spacer()
-                
-                Button(action: {}) {
-                    Image(systemName: "gear")
+        ZStack {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("MiMo2.5-Pro")
                         .font(.title)
+                        .fontWeight(.bold)
                         .foregroundColor(.black)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 60)
-            .padding(.bottom, 20)
-            
-            ScrollView {
-                VStack(spacing: 16) {
-                    ForEach(messages) { message in
-                        MessageBubble(message: message)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gear")
+                            .font(.title)
+                            .foregroundColor(.black)
                     }
                 }
                 .padding(.horizontal, 20)
+                .padding(.top, 60)
                 .padding(.bottom, 20)
-            }
-            
-            HStack(spacing: 0) {
-                TextField("请输入文本，支持多行", text: $inputText)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color.white)
-                    .cornerRadius(0)
                 
-                Button(action: sendMessage) {
-                    Text("发送")
-                        .font(.title2)
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color.gray.opacity(0.3))
-                        .cornerRadius(0)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        ForEach(messages) { message in
+                            MessageBubble(message: message)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
                 }
+                
+                HStack(spacing: 0) {
+                    TextField("请输入文本，支持多行", text: $inputText)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color.white)
+                        .cornerRadius(0)
+                    
+                    Button(action: sendMessage) {
+                        Text("发送")
+                            .font(.title2)
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Color.gray.opacity(0.3))
+                            .cornerRadius(0)
+                    }
+                }
+                .border(Color.black, width: 1)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 30)
             }
-            .border(Color.black, width: 1)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 30)
+            .background(Color.white)
+            
+            if showSettings {
+                SettingsView(
+                    showSettings: $showSettings,
+                    mimoToken: $mimoToken
+                )
+            }
         }
-        .background(Color.white)
     }
     
     private func sendMessage() {
@@ -157,6 +195,80 @@ struct ChatView: View {
             messages.append(Message(text: inputText, isUser: true))
             messages.append(Message(text: "这是模拟回复", isUser: false))
             inputText = ""
+        }
+    }
+}
+
+struct SettingsView: View {
+    @Binding var showSettings: Bool
+    @Binding var mimoToken: String
+    @State private var showTokenAlert = false
+    @State private var tempToken = ""
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.3)
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture {
+                    showSettings = false
+                }
+            
+            VStack(spacing: 0) {
+                HStack {
+                    Text("设置")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        showSettings = false
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.title)
+                            .foregroundColor(.black)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 60)
+                .padding(.bottom, 20)
+                
+                VStack(spacing: 20) {
+                    Button(action: {
+                        // 清除聊天记录功能（占位）
+                    }) {
+                        Text("清除之前的聊天记录")
+                            .font(.title)
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    
+                    Button(action: {
+                        tempToken = mimoToken
+                        showTokenAlert = true
+                    }) {
+                        Text("输入mimo的token")
+                            .font(.title)
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.horizontal, 20)
+                
+                Spacer()
+            }
+            .background(Color.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .alert("设置token", isPresented: $showTokenAlert) {
+                TextField("请输入token", text: $tempToken)
+                Button("取消", role: .cancel) { }
+                Button("确定") {
+                    mimoToken = tempToken
+                }
+            } message: {
+                Text("请输入您的mimo token")
+            }
         }
     }
 }
