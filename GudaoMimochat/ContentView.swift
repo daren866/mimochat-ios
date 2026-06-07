@@ -6,12 +6,25 @@ struct Message: Identifiable {
     let isUser: Bool
 }
 
+struct ChatRecord: Identifiable {
+    let id = UUID()
+    let title: String
+    let messages: [Message]
+}
+
 struct ContentView: View {
     @State private var inputText = ""
     @State private var messages: [Message] = []
     @State private var showChat = false
     @State private var showSettings = false
+    @State private var showChatHistory = false
     @State private var mimoToken = ""
+    @State private var chatRecords: [ChatRecord] = [
+        ChatRecord(title: "芒果西瓜对抗", messages: []),
+        ChatRecord(title: "芒果西瓜对抗", messages: []),
+        ChatRecord(title: "芒果西瓜对抗", messages: []),
+        ChatRecord(title: "芒果西瓜对抗", messages: []),
+    ]
     
     var body: some View {
         if showChat {
@@ -19,14 +32,18 @@ struct ContentView: View {
                 messages: $messages,
                 inputText: $inputText,
                 showSettings: $showSettings,
-                mimoToken: $mimoToken
+                showChatHistory: $showChatHistory,
+                mimoToken: $mimoToken,
+                chatRecords: $chatRecords
             )
         } else {
             WelcomeView(
                 inputText: $inputText,
                 onSend: sendMessage,
                 showSettings: $showSettings,
-                mimoToken: $mimoToken
+                showChatHistory: $showChatHistory,
+                mimoToken: $mimoToken,
+                chatRecords: $chatRecords
             )
         }
     }
@@ -35,6 +52,10 @@ struct ContentView: View {
         if !inputText.trimmingCharacters(in: .whitespaces).isEmpty {
             messages.append(Message(text: inputText, isUser: true))
             messages.append(Message(text: "你好有什么可以帮助的吗?", isUser: false))
+            chatRecords.insert(ChatRecord(title: inputText, messages: messages), at: 0)
+            if chatRecords.count > 4 {
+                chatRecords.removeLast()
+            }
             showChat = true
             inputText = ""
         }
@@ -45,9 +66,9 @@ struct WelcomeView: View {
     @Binding var inputText: String
     let onSend: () -> Void
     @Binding var showSettings: Bool
+    @Binding var showChatHistory: Bool
     @Binding var mimoToken: String
-    @State private var showTokenAlert = false
-    @State private var tempToken = ""
+    @Binding var chatRecords: [ChatRecord]
     
     var body: some View {
         ZStack {
@@ -62,6 +83,14 @@ struct WelcomeView: View {
                         .foregroundColor(.black)
                     
                     Spacer()
+                    
+                    Button(action: {
+                        showChatHistory = true
+                    }) {
+                        Image(systemName: "doc.text")
+                            .font(.title)
+                            .foregroundColor(.black)
+                    }
                     
                     Button(action: {
                         showSettings = true
@@ -115,6 +144,13 @@ struct WelcomeView: View {
                     mimoToken: $mimoToken
                 )
             }
+            
+            if showChatHistory {
+                ChatHistoryView(
+                    showChatHistory: $showChatHistory,
+                    chatRecords: $chatRecords
+                )
+            }
         }
     }
 }
@@ -123,7 +159,9 @@ struct ChatView: View {
     @Binding var messages: [Message]
     @Binding var inputText: String
     @Binding var showSettings: Bool
+    @Binding var showChatHistory: Bool
     @Binding var mimoToken: String
+    @Binding var chatRecords: [ChatRecord]
     
     var body: some View {
         ZStack {
@@ -135,6 +173,14 @@ struct ChatView: View {
                         .foregroundColor(.black)
                     
                     Spacer()
+                    
+                    Button(action: {
+                        showChatHistory = true
+                    }) {
+                        Image(systemName: "doc.text")
+                            .font(.title)
+                            .foregroundColor(.black)
+                    }
                     
                     Button(action: {
                         showSettings = true
@@ -185,6 +231,13 @@ struct ChatView: View {
                 SettingsView(
                     showSettings: $showSettings,
                     mimoToken: $mimoToken
+                )
+            }
+            
+            if showChatHistory {
+                ChatHistoryView(
+                    showChatHistory: $showChatHistory,
+                    chatRecords: $chatRecords
                 )
             }
         }
@@ -269,6 +322,58 @@ struct SettingsView: View {
             } message: {
                 Text("请输入您的mimo token")
             }
+        }
+    }
+}
+
+struct ChatHistoryView: View {
+    @Binding var showChatHistory: Bool
+    @Binding var chatRecords: [ChatRecord]
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.3)
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture {
+                    showChatHistory = false
+                }
+            
+            VStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    Text("聊天列表")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
+                        .padding(.top, 16)
+                    
+                    Divider()
+                        .background(Color.black)
+                    
+                    ForEach(chatRecords) { record in
+                        Button(action: {
+                            showChatHistory = false
+                        }) {
+                            Text(record.title)
+                                .font(.title)
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 12)
+                        }
+                        Divider()
+                            .background(Color.black)
+                    }
+                    
+                    Text("目前仅展示前四个对话记录")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 16)
+                }
+                .border(Color.black, width: 1)
+                .background(Color.white)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 80)
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 }
