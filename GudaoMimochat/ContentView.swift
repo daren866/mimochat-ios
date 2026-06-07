@@ -1,9 +1,18 @@
 import SwiftUI
 
+// MARK: - 数据模型
+
 struct Message: Identifiable {
     let id = UUID()
     let text: String
     let isUser: Bool
+    let timestamp: Date
+
+    init(text: String, isUser: Bool) {
+        self.text = text
+        self.isUser = isUser
+        self.timestamp = Date()
+    }
 }
 
 struct ChatRecord: Identifiable, Codable {
@@ -16,19 +25,14 @@ struct ChatRecord: Identifiable, Codable {
     let updater: String
     let deleteFlag: Int
     let type: String
-    
+
     enum CodingKeys: String, CodingKey {
-        case title
-        case conversationId
-        case createTime
-        case updateTime
-        case creator
-        case updater
-        case deleteFlag
-        case type
+        case title, conversationId, createTime, updateTime
+        case creator, updater, deleteFlag, type
     }
-    
-    init(title: String, conversationId: String, createTime: String, updateTime: String, creator: String, updater: String, deleteFlag: Int, type: String) {
+
+    init(title: String, conversationId: String, createTime: String, updateTime: String,
+         creator: String, updater: String, deleteFlag: Int, type: String) {
         self.id = UUID()
         self.title = title
         self.conversationId = conversationId
@@ -39,7 +43,7 @@ struct ChatRecord: Identifiable, Codable {
         self.deleteFlag = deleteFlag
         self.type = type
     }
-    
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = UUID()
@@ -71,6 +75,151 @@ struct PageInfo: Codable {
     let pageSize: Int
 }
 
+struct SendMessageResponse: Codable {
+    let code: Int
+    let msg: String
+    let data: SendMessageData?
+}
+
+struct SendMessageData: Codable {
+    let content: String?
+    let conversationId: String?
+    let messageId: String?
+}
+
+// MARK: - 网络管理器
+
+class NetworkManager {
+    static let shared = NetworkManager()
+    private init() {}
+
+    private let baseURL = "https://aistudio.xiaomimimo.com/open-apis"
+    private let ph = "ELjE%2FJoWhAXG%2ByRH0Qx%2BDw%3D%3D"
+
+    private func baseRequest(path: String, token: String) -> URLRequest {
+        let urlString = "\(baseURL)/\(path)?xiaomichatbot_ph=\(ph)"
+        let url = URL(string: urlString)!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("*/*", forHTTPHeaderField: "accept")
+        request.setValue("system", forHTTPHeaderField: "accept-language")
+        request.setValue("no-cache", forHTTPHeaderField: "cache-control")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue("no-cache", forHTTPHeaderField: "pragma")
+        request.setValue("u=1, i", forHTTPHeaderField: "priority")
+        request.setValue("Etc/GMT-8", forHTTPHeaderField: "x-timezone")
+        request.setValue(token, forHTTPHeaderField: "cookie")
+        request.setValue("https://aistudio.xiaomimimo.com/", forHTTPHeaderField: "Referer")
+        return request
+    }
+
+    // MARK: - 获取聊天列表
+    func fetchChatRecords(token: String, completion: @escaping (Result<[ChatRecord], Error>) -> Void) {
+        var request = baseRequest(path: "chat/conversation/list", token: token)
+        let body: [String: Any] = [
+            "pageInfo": ["pageNum": 1, "pageSize": 20]
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "NetworkManager", code: -1,
+                                               userInfo: [NSLocalizedDescriptionKey: "无数据返回"])))
+                }
+                return
+            }
+            do {
+                let resp = try JSONDecoder().decode(ChatListResponse.self, from: data)
+                if resp.code == 0 {
+                    DispatchQueue.main.async { completion(.success(resp.data.dataList)) }
+                } else {
+                    DispatchQueue.main.async {
+                        completion(.failure(NSError(domain: "API", code: resp.code,
+                                                   userInfo: [NSLocalizedDescriptionKey: resp.msg])))
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }.resume()
+    }
+
+    // MARK: - 发送消息
+    func sendMessage(token: String, message: String, conversationId: String?,
+                     completion: @escaping (Result<SendMessageData, Error>) -> Void) {
+
+        var request = baseRequest(path: "chat/conversation/send", token: token)
+
+        var body: [String: Any] = [
+            "content": message,
+            "type": "text"
+        ]
+        if let convId = conversationId {
+            body["conversationId"] = convId
+        }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "NetworkManager", code: -1,
+                                               userInfo: [NSLocalizedDescriptionKey: "无数据返回"])))
+                }
+                return
+            }
+
+            let rawString = String(data: data, encoding: .utf8) ?? ""
+            print("=== API Response ===\n\(rawString)\n====================")
+
+            do {
+                let resp = try JSONDecoder().decode(SendMessageResponse.self, from: data)
+                if resp.code == 0, let dataObj = resp.data {
+                    DispatchQueue.main.async { completion(.success(dataObj)) }
+                } else {
+                    // 尝试备用解析：有些接口直接返回 content 字段
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let dataDict = json["data"] as? [String: Any],
+                       let content = dataDict["content"] as? String {
+                        let fallback = SendMessageData(content: content,
+                                                       conversationId: dataDict["conversationId"] as? String,
+                                                       messageId: dataDict["messageId"] as? String)
+                        DispatchQueue.main.async { completion(.success(fallback)) }
+                    } else {
+                        DispatchQueue.main.async {
+                            completion(.failure(NSError(domain: "API", code: resp.code,
+                                                       userInfo: [NSLocalizedDescriptionKey: resp.msg])))
+                        }
+                    }
+                }
+            } catch {
+                // 最终兜底：尝试从原始 JSON 提取内容
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let content = json["content"] as? String
+                        ?? json["reply"] as? String
+                        ?? json["message"] as? String
+                        ?? rawString
+                    let fallback = SendMessageData(content: content,
+                                                   conversationId: nil, messageId: nil)
+                    DispatchQueue.main.async { completion(.success(fallback)) }
+                } else {
+                    DispatchQueue.main.async { completion(.failure(error)) }
+                }
+            }
+        }.resume()
+    }
+}
+
+// MARK: - ContentView
+
 struct ContentView: View {
     @State private var inputText = ""
     @State private var messages: [Message] = []
@@ -80,8 +229,10 @@ struct ContentView: View {
     @State private var mimoToken = ""
     @State private var chatRecords: [ChatRecord] = []
     @State private var isLoading = false
+    @State private var currentConversationId: String?
+    @State private var errorMessage: String?
     private let tokenKey = "mimoCookieToken"
-    
+
     var body: some View {
         if showChat {
             ChatView(
@@ -91,6 +242,8 @@ struct ContentView: View {
                 showChatHistory: $showChatHistory,
                 mimoToken: $mimoToken,
                 chatRecords: $chatRecords,
+                isLoading: $isLoading,
+                currentConversationId: $currentConversationId,
                 loadChatRecords: loadChatRecords,
                 saveToken: saveToken
             )
@@ -102,6 +255,8 @@ struct ContentView: View {
                 showChatHistory: $showChatHistory,
                 mimoToken: $mimoToken,
                 chatRecords: $chatRecords,
+                isLoading: $isLoading,
+                errorMessage: $errorMessage,
                 loadChatRecords: loadChatRecords,
                 saveToken: saveToken
             )
@@ -110,85 +265,70 @@ struct ContentView: View {
     .onAppear {
         loadToken()
     }
-    
+
     private func saveToken(_ token: String) {
         mimoToken = token
         UserDefaults.standard.set(token, forKey: tokenKey)
     }
-    
+
     private func loadToken() {
         if let savedToken = UserDefaults.standard.string(forKey: tokenKey) {
             mimoToken = savedToken
         }
     }
-    
+
     private func sendMessage() {
-        if !inputText.trimmingCharacters(in: .whitespaces).isEmpty {
-            messages.append(Message(text: inputText, isUser: true))
-            messages.append(Message(text: "你好有什么可以帮助的吗?", isUser: false))
-            showChat = true
-            inputText = ""
-        }
-    }
-    
-    private func loadChatRecords() {
-        guard !mimoToken.isEmpty else { return }
-        
-        isLoading = true
-        
-        let url = URL(string: "https://aistudio.xiaomimimo.com/open-apis/chat/conversation/list?xiaomichatbot_ph=ELjE%2FJoWhAXG%2ByRH0Qx%2BDw%3D%3D")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("*/*", forHTTPHeaderField: "accept")
-        request.setValue("system", forHTTPHeaderField: "accept-language")
-        request.setValue("no-cache", forHTTPHeaderField: "cache-control")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-        request.setValue("no-cache", forHTTPHeaderField: "pragma")
-        request.setValue("u=1, i", forHTTPHeaderField: "priority")
-        request.setValue("Etc/GMT-8", forHTTPHeaderField: "x-timezone")
-        request.setValue(mimoToken, forHTTPHeaderField: "cookie")
-        request.setValue("https://aistudio.xiaomimimo.com/", forHTTPHeaderField: "Referer")
-        
-        let pageInfo = PageInfo(pageNum: 1, pageSize: 20)
-        let body = ["pageInfo": pageInfo]
-        
-        do {
-            let encoder = JSONEncoder()
-            request.httpBody = try encoder.encode(body)
-        } catch {
-            print("Failed to serialize request body: \(error)")
-            isLoading = false
+        let trimmed = inputText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+
+        guard !mimoToken.isEmpty else {
+            errorMessage = "请先在设置中配置 Token"
+            showSettings = true
             return
         }
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                isLoading = false
-                
-                if let error = error {
-                    print("Request failed: \(error)")
-                    return
+
+        messages.append(Message(text: trimmed, isUser: true))
+        showChat = true
+        inputText = ""
+        isLoading = true
+        errorMessage = nil
+
+        NetworkManager.shared.sendMessage(
+            token: mimoToken,
+            message: trimmed,
+            conversationId: currentConversationId
+        ) { result in
+            isLoading = false
+            switch result {
+            case .success(let data):
+                let reply = data.content ?? "收到空回复"
+                messages.append(Message(text: reply, isUser: false))
+                if let convId = data.conversationId {
+                    currentConversationId = convId
                 }
-                
-                guard let data = data else {
-                    print("No data received")
-                    return
-                }
-                
-                do {
-                    let decoder = JSONDecoder()
-                    let response = try decoder.decode(ChatListResponse.self, from: data)
-                    if response.code == 0 {
-                        chatRecords = Array(response.data.dataList.prefix(4))
-                    }
-                } catch {
-                    print("Failed to decode response: \(error)")
-                    print("Response data: \(String(data: data, encoding: .utf8) ?? "N/A")")
-                }
+            case .failure(let error):
+                messages.append(Message(text: "请求失败：\(error.localizedDescription)", isUser: false))
             }
-        }.resume()
+        }
+    }
+
+    private func loadChatRecords() {
+        guard !mimoToken.isEmpty else { return }
+        isLoading = true
+
+        NetworkManager.shared.fetchChatRecords(token: mimoToken) { result in
+            isLoading = false
+            switch result {
+            case .success(let records):
+                chatRecords = Array(records.prefix(4))
+            case .failure(let error):
+                print("加载聊天记录失败: \(error)")
+            }
+        }
     }
 }
+
+// MARK: - WelcomeView
 
 struct WelcomeView: View {
     @Binding var inputText: String
@@ -197,34 +337,32 @@ struct WelcomeView: View {
     @Binding var showChatHistory: Bool
     @Binding var mimoToken: String
     @Binding var chatRecords: [ChatRecord]
+    @Binding var isLoading: Bool
+    @Binding var errorMessage: String?
     let loadChatRecords: () -> Void
     let saveToken: (String) -> Void
-    
+
     var body: some View {
         ZStack {
             Color.white
                 .edgesIgnoringSafeArea(.all)
-            
+
             VStack(spacing: 0) {
                 HStack {
                     Text("MiMo2.5-Pro")
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
-                    
+
                     Spacer()
-                    
-                    Button(action: {
-                        showChatHistory = true
-                    }) {
+
+                    Button(action: { showChatHistory = true }) {
                         Image(systemName: "doc.text")
                             .font(.title)
                             .foregroundColor(.black)
                     }
-                    
-                    Button(action: {
-                        showSettings = true
-                    }) {
+
+                    Button(action: { showSettings = true }) {
                         Image(systemName: "gear")
                             .font(.title)
                             .foregroundColor(.black)
@@ -233,41 +371,54 @@ struct WelcomeView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 60)
                 .padding(.bottom, 20)
-                
+
                 Spacer()
             }
-            
+
             VStack(spacing: 30) {
                 Text("有什么需要帮忙的？")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
-                
+
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.red)
+                        .padding(.horizontal, 20)
+                }
+
                 HStack(spacing: 0) {
-                    TextField("请输入文本，支持多行", text: $inputText)
+                    TextField("请输入文本", text: $inputText)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(Color.white)
                         .cornerRadius(0)
-                    
+                        .disabled(isLoading)
+
                     Button(action: {
-                        if !inputText.trimmingCharacters(in: .whitespaces).isEmpty {
-                            onSend()
-                        }
+                        onSend()
                     }) {
-                        Text("发送")
-                            .font(.title2)
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(Color.gray.opacity(0.3))
-                            .cornerRadius(0)
+                        if isLoading {
+                            ProgressView()
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                        } else {
+                            Text("发送")
+                                .font(.title2)
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(Color.gray.opacity(0.3))
+                                .cornerRadius(0)
+                        }
                     }
+                    .disabled(isLoading)
                 }
                 .border(Color.black, width: 1)
                 .padding(.horizontal, 20)
             }
-            
+
             if showSettings {
                 SettingsView(
                     showSettings: $showSettings,
@@ -275,7 +426,7 @@ struct WelcomeView: View {
                     saveToken: saveToken
                 )
             }
-            
+
             if showChatHistory {
                 ChatHistoryView(
                     showChatHistory: $showChatHistory,
@@ -286,6 +437,8 @@ struct WelcomeView: View {
         }
     }
 }
+
+// MARK: - ChatView
 
 struct ChatView: View {
     @Binding var messages: [Message]
@@ -294,9 +447,11 @@ struct ChatView: View {
     @Binding var showChatHistory: Bool
     @Binding var mimoToken: String
     @Binding var chatRecords: [ChatRecord]
+    @Binding var isLoading: Bool
+    @Binding var currentConversationId: String?
     let loadChatRecords: () -> Void
     let saveToken: (String) -> Void
-    
+
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
@@ -305,20 +460,16 @@ struct ChatView: View {
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
-                    
+
                     Spacer()
-                    
-                    Button(action: {
-                        showChatHistory = true
-                    }) {
+
+                    Button(action: { showChatHistory = true }) {
                         Image(systemName: "doc.text")
                             .font(.title)
                             .foregroundColor(.black)
                     }
-                    
-                    Button(action: {
-                        showSettings = true
-                    }) {
+
+                    Button(action: { showSettings = true }) {
                         Image(systemName: "gear")
                             .font(.title)
                             .foregroundColor(.black)
@@ -327,40 +478,73 @@ struct ChatView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 60)
                 .padding(.bottom, 20)
-                
-                ScrollView {
-                    VStack(spacing: 16) {
-                        ForEach(messages) { message in
-                            MessageBubble(message: message)
+
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(messages) { message in
+                                MessageBubble(message: message)
+                                    .id(message.id)
+                            }
+
+                            if isLoading {
+                                HStack {
+                                    TypingIndicator()
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 20)
+                                .id("loading")
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
+                    }
+                    .onChange(of: messages.count) { _ in
+                        withAnimation {
+                            proxy.scrollTo(messages.last?.id, anchor: .bottom)
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+                    .onChange(of: isLoading) { _ in
+                        withAnimation {
+                            proxy.scrollTo("loading", anchor: .bottom)
+                        }
+                    }
                 }
-                
+
                 HStack(spacing: 0) {
-                    TextField("请输入文本，支持多行", text: $inputText)
+                    TextField("请输入文本", text: $inputText)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(Color.white)
                         .cornerRadius(0)
-                    
+                        .disabled(isLoading)
+                        .onSubmit {
+                            sendMessage()
+                        }
+
                     Button(action: sendMessage) {
-                        Text("发送")
-                            .font(.title2)
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(Color.gray.opacity(0.3))
-                            .cornerRadius(0)
+                        if isLoading {
+                            ProgressView()
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                        } else {
+                            Text("发送")
+                                .font(.title2)
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(Color.gray.opacity(0.3))
+                                .cornerRadius(0)
+                        }
                     }
+                    .disabled(isLoading)
                 }
                 .border(Color.black, width: 1)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 30)
             }
             .background(Color.white)
-            
+
             if showSettings {
                 SettingsView(
                     showSettings: $showSettings,
@@ -368,7 +552,7 @@ struct ChatView: View {
                     saveToken: saveToken
                 )
             }
-            
+
             if showChatHistory {
                 ChatHistoryView(
                     showChatHistory: $showChatHistory,
@@ -378,42 +562,94 @@ struct ChatView: View {
             }
         }
     }
-    
+
     private func sendMessage() {
-        if !inputText.trimmingCharacters(in: .whitespaces).isEmpty {
-            messages.append(Message(text: inputText, isUser: true))
-            messages.append(Message(text: "这是模拟回复", isUser: false))
-            inputText = ""
+        let trimmed = inputText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !isLoading else { return }
+
+        guard !mimoToken.isEmpty else {
+            messages.append(Message(text: "请先在设置中配置 Token", isUser: false))
+            return
+        }
+
+        messages.append(Message(text: trimmed, isUser: true))
+        inputText = ""
+        isLoading = true
+
+        NetworkManager.shared.sendMessage(
+            token: mimoToken,
+            message: trimmed,
+            conversationId: currentConversationId
+        ) { result in
+            isLoading = false
+            switch result {
+            case .success(let data):
+                let reply = data.content ?? "收到空回复"
+                messages.append(Message(text: reply, isUser: false))
+                if let convId = data.conversationId {
+                    currentConversationId = convId
+                }
+            case .failure(let error):
+                messages.append(Message(text: "请求失败：\(error.localizedDescription)", isUser: false))
+            }
         }
     }
 }
+
+// MARK: - TypingIndicator
+
+struct TypingIndicator: View {
+    @State private var phase = 0.0
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(Color.gray.opacity(0.5))
+                    .frame(width: 8, height: 8)
+                    .offset(y: phase == Double(index) ? -6 : 0)
+                    .animation(
+                        .easeInOut(duration: 0.4)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.15),
+                        value: phase
+                    )
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(Color.gray.opacity(0.2))
+        .cornerRadius(12)
+        .onAppear {
+            phase = 1.0
+        }
+    }
+}
+
+// MARK: - SettingsView
 
 struct SettingsView: View {
     @Binding var showSettings: Bool
     let mimoToken: String
     let saveToken: (String) -> Void
     @State private var showTokenView = false
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.3)
                 .edgesIgnoringSafeArea(.all)
-                .onTapGesture {
-                    showSettings = false
-                }
-            
+                .onTapGesture { showSettings = false }
+
             VStack(spacing: 0) {
                 HStack {
                     Text("设置")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
-                    
+
                     Spacer()
-                    
-                    Button(action: {
-                        showSettings = false
-                    }) {
+
+                    Button(action: { showSettings = false }) {
                         Image(systemName: "xmark")
                             .font(.title)
                             .foregroundColor(.black)
@@ -422,33 +658,43 @@ struct SettingsView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 60)
                 .padding(.bottom, 20)
-                
+
                 VStack(spacing: 20) {
                     Button(action: {
-                        // 清除聊天记录功能（占位）
+                        // 清除聊天记录（占位）
                     }) {
                         Text("清除之前的聊天记录")
                             .font(.title)
                             .foregroundColor(.red)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    
-                    Button(action: {
-                        showTokenView = true
-                    }) {
-                        Text("输入mimo的token")
-                            .font(.title)
-                            .foregroundColor(.black)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Button(action: { showTokenView = true }) {
+                        HStack {
+                            Text("输入mimo的token")
+                                .font(.title)
+                                .foregroundColor(.black)
+                            Spacer()
+                            if mimoToken.isEmpty {
+                                Text("未配置")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            } else {
+                                Text("已配置")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(.horizontal, 20)
-                
+
                 Spacer()
             }
             .background(Color.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
+
             if showTokenView {
                 TokenSettingView(
                     showTokenView: $showTokenView,
@@ -460,37 +706,41 @@ struct SettingsView: View {
     }
 }
 
+// MARK: - TokenSettingView
+
 struct TokenSettingView: View {
     @Binding var showTokenView: Bool
     let mimoToken: String
     let saveToken: (String) -> Void
     @State private var inputText = ""
-    
+    @State private var saved = false
+
     var body: some View {
         ZStack {
             Color.white
                 .edgesIgnoringSafeArea(.all)
-            
+
             VStack(spacing: 0) {
                 HStack {
-                    Button(action: {
-                        showTokenView = false
-                    }) {
+                    Button(action: { showTokenView = false }) {
                         Image(systemName: "arrow.left")
                             .font(.title)
                             .foregroundColor(.black)
                     }
-                    
+
                     Text("设置token")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
-                    
+
                     Spacer()
-                    
+
                     Button(action: {
                         saveToken(inputText)
-                        showTokenView = false
+                        saved = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            showTokenView = false
+                        }
                     }) {
                         Text("保存")
                             .font(.title)
@@ -500,14 +750,30 @@ struct TokenSettingView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 60)
                 .padding(.bottom, 20)
-                
-                TextField("请输入cookie", text: $inputText)
-                    .font(.title)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .border(Color.black, width: 1)
-                    .padding(.horizontal, 20)
-                
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("请输入从浏览器获取的 Cookie")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+
+                    TextEditor(text: $inputText)
+                        .font(.body)
+                        .frame(minHeight: 120)
+                        .padding(4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Color.black, lineWidth: 1)
+                        )
+                }
+                .padding(.horizontal, 20)
+
+                if saved {
+                    Text("保存成功!")
+                        .foregroundColor(.green)
+                        .font(.headline)
+                        .padding(.top, 12)
+                }
+
                 Spacer()
             }
         }
@@ -517,48 +783,84 @@ struct TokenSettingView: View {
     }
 }
 
+// MARK: - ChatHistoryView
+
 struct ChatHistoryView: View {
     @Binding var showChatHistory: Bool
     @Binding var chatRecords: [ChatRecord]
     let loadChatRecords: () -> Void
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.3)
                 .edgesIgnoringSafeArea(.all)
-                .onTapGesture {
-                    showChatHistory = false
-                }
-            
+                .onTapGesture { showChatHistory = false }
+
             VStack(spacing: 0) {
                 VStack(spacing: 0) {
-                    Text("聊天列表")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                        .padding(.top, 16)
-                    
+                    HStack {
+                        Text("聊天列表")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                        Spacer()
+                        Button(action: { showChatHistory = false }) {
+                            Image(systemName: "xmark")
+                                .font(.title2)
+                                .foregroundColor(.black)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+
                     Divider()
                         .background(Color.black)
-                    
-                    ForEach(chatRecords) { record in
-                        Button(action: {
-                            showChatHistory = false
-                        }) {
-                            Text(record.title)
-                                .font(.title)
-                                .foregroundColor(.black)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 12)
+
+                    if chatRecords.isEmpty {
+                        VStack(spacing: 8) {
+                            Spacer()
+                            Text("暂无聊天记录")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                            Text("请先配置 Token")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            Spacer()
                         }
-                        Divider()
-                            .background(Color.black)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 200)
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                ForEach(chatRecords) { record in
+                                    Button(action: {
+                                        showChatHistory = false
+                                    }) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(record.title)
+                                                .font(.headline)
+                                                .foregroundColor(.black)
+                                                .lineLimit(2)
+                                            Text(record.updateTime)
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.vertical, 12)
+                                        .padding(.horizontal, 16)
+                                    }
+                                    Divider()
+                                        .background(Color.gray.opacity(0.3))
+                                }
+                            }
+                        }
                     }
-                    
+
                     Text("目前仅展示前四个对话记录")
                         .font(.caption)
                         .foregroundColor(.gray)
-                        .padding(.bottom, 16)
+                        .padding(.vertical, 8)
                 }
                 .border(Color.black, width: 1)
                 .background(Color.white)
@@ -573,28 +875,47 @@ struct ChatHistoryView: View {
     }
 }
 
+// MARK: - MessageBubble
+
 struct MessageBubble: View {
     let message: Message
-    
+
     var body: some View {
-        HStack {
+        HStack(alignment: .top, spacing: 8) {
             if message.isUser {
-                Spacer()
-                Text(message.text)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+                Spacer(minLength: 50)
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(message.text)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(16)
+                }
             } else {
-                Text(message.text)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color.gray.opacity(0.2))
-                    .foregroundColor(.black)
-                    .cornerRadius(12)
-                Spacer()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(message.text)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color.gray.opacity(0.2))
+                        .foregroundColor(.black)
+                        .cornerRadius(16)
+                }
+
+                Spacer(minLength: 50)
             }
+        }
+    }
+}
+
+// MARK: - App入口
+
+@main
+struct MiMoChatApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
         }
     }
 }
