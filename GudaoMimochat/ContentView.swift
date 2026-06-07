@@ -15,7 +15,7 @@ struct ContentView: View {
         if showChat {
             ChatView(messages: $messages, inputText: $inputText)
         } else {
-            WelcomeView(onSend: sendMessage)
+            WelcomeView(inputText: $inputText, onSend: sendMessage)
         }
     }
     
@@ -30,8 +30,8 @@ struct ContentView: View {
 }
 
 struct WelcomeView: View {
+    @Binding var inputText: String
     let onSend: () -> Void
-    @State private var inputText = ""
     
     var body: some View {
         ZStack {
