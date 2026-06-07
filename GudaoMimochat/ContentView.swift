@@ -80,6 +80,7 @@ struct ContentView: View {
     @State private var mimoToken = ""
     @State private var chatRecords: [ChatRecord] = []
     @State private var isLoading = false
+    private let tokenKey = "mimoCookieToken"
     
     var body: some View {
         if showChat {
@@ -90,7 +91,8 @@ struct ContentView: View {
                 showChatHistory: $showChatHistory,
                 mimoToken: $mimoToken,
                 chatRecords: $chatRecords,
-                loadChatRecords: loadChatRecords
+                loadChatRecords: loadChatRecords,
+                saveToken: saveToken
             )
         } else {
             WelcomeView(
@@ -100,8 +102,23 @@ struct ContentView: View {
                 showChatHistory: $showChatHistory,
                 mimoToken: $mimoToken,
                 chatRecords: $chatRecords,
-                loadChatRecords: loadChatRecords
+                loadChatRecords: loadChatRecords,
+                saveToken: saveToken
             )
+        }
+    }
+    .onAppear {
+        loadToken()
+    }
+    
+    private func saveToken(_ token: String) {
+        mimoToken = token
+        UserDefaults.standard.set(token, forKey: tokenKey)
+    }
+    
+    private func loadToken() {
+        if let savedToken = UserDefaults.standard.string(forKey: tokenKey) {
+            mimoToken = savedToken
         }
     }
     
@@ -181,6 +198,7 @@ struct WelcomeView: View {
     @Binding var mimoToken: String
     @Binding var chatRecords: [ChatRecord]
     let loadChatRecords: () -> Void
+    let saveToken: (String) -> Void
     
     var body: some View {
         ZStack {
@@ -253,7 +271,8 @@ struct WelcomeView: View {
             if showSettings {
                 SettingsView(
                     showSettings: $showSettings,
-                    mimoToken: $mimoToken
+                    mimoToken: mimoToken,
+                    saveToken: saveToken
                 )
             }
             
@@ -276,6 +295,7 @@ struct ChatView: View {
     @Binding var mimoToken: String
     @Binding var chatRecords: [ChatRecord]
     let loadChatRecords: () -> Void
+    let saveToken: (String) -> Void
     
     var body: some View {
         ZStack {
@@ -344,7 +364,8 @@ struct ChatView: View {
             if showSettings {
                 SettingsView(
                     showSettings: $showSettings,
-                    mimoToken: $mimoToken
+                    mimoToken: mimoToken,
+                    saveToken: saveToken
                 )
             }
             
@@ -369,7 +390,8 @@ struct ChatView: View {
 
 struct SettingsView: View {
     @Binding var showSettings: Bool
-    @Binding var mimoToken: String
+    let mimoToken: String
+    let saveToken: (String) -> Void
     @State private var showTokenView = false
     
     var body: some View {
@@ -430,7 +452,8 @@ struct SettingsView: View {
             if showTokenView {
                 TokenSettingView(
                     showTokenView: $showTokenView,
-                    mimoToken: $mimoToken
+                    mimoToken: mimoToken,
+                    saveToken: saveToken
                 )
             }
         }
@@ -439,7 +462,8 @@ struct SettingsView: View {
 
 struct TokenSettingView: View {
     @Binding var showTokenView: Bool
-    @Binding var mimoToken: String
+    let mimoToken: String
+    let saveToken: (String) -> Void
     @State private var inputText = ""
     
     var body: some View {
@@ -465,7 +489,7 @@ struct TokenSettingView: View {
                     Spacer()
                     
                     Button(action: {
-                        mimoToken = inputText
+                        saveToken(inputText)
                         showTokenView = false
                     }) {
                         Text("保存")
