@@ -857,7 +857,7 @@ struct ChatHistoryView: View {
                         }
                     }
 
-                    Text("目前仅展示前四个对话记录")
+                    Text("目前仅展示前4个对话记录")
                         .font(.caption)
                         .foregroundColor(.gray)
                         .padding(.vertical, 8)
