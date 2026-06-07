@@ -1,0 +1,230 @@
+{
+    "code": 0,
+    "msg": "成功",
+    "data": {
+        "total": 417,
+        "pageNum": 1,
+        "dataList": [
+            {
+                "id": 4812219,
+                "creator": "2676228670",
+                "createTime": "2026-06-06 23:37:55",
+                "updater": "2676228670",
+                "updateTime": "2026-06-06 23:45:12",
+                "title": "HTML液态玻璃界面效果",
+                "conversationId": "1152b7a4a4a66953a76ef9654fa8f1ed",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4812138,
+                "creator": "2676228670",
+                "createTime": "2026-06-06 23:33:39",
+                "updater": "2676228670",
+                "updateTime": "2026-06-06 23:33:52",
+                "title": "Linux日志查看与过滤命令",
+                "conversationId": "a010aa7048f516c400180f344ea924a8",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4801207,
+                "creator": "2676228670",
+                "createTime": "2026-06-06 15:53:42",
+                "updater": "2676228670",
+                "updateTime": "2026-06-06 15:59:33",
+                "title": "液态玻璃手机模拟器",
+                "conversationId": "a7563170fc3e90c3e641bd5bae550c72",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4791388,
+                "creator": "2676228670",
+                "createTime": "2026-06-06 08:31:41",
+                "updater": "2676228670",
+                "updateTime": "2026-06-06 10:46:38",
+                "title": "Linux6虚拟机版镜像构建",
+                "conversationId": "c8aa4ec7eb6ceef4746894d3168c76a7",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596851,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:41:43",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:42:05",
+                "title": "API对话",
+                "conversationId": "943dc12e677740839064e958c4bfe30f",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596807,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:40:56",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:41:21",
+                "title": "API对话",
+                "conversationId": "a850c6230a4c49f88b84a35ce8a78546",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596701,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:39:03",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:39:15",
+                "title": "API对话",
+                "conversationId": "c893871c0b8c4ba6a0519887254094f6",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596154,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:30:42",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:38:40",
+                "title": "API对话",
+                "conversationId": "85fc2eb86705441b9c83203912512081",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596566,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:36:42",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:36:52",
+                "title": "API对话",
+                "conversationId": "b7880265ce44447f86345d7c94086ff1",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596498,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:35:33",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:35:49",
+                "title": "API对话",
+                "conversationId": "dfb4f34fe5234a00a29dc47693cca696",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596493,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:35:24",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:35:28",
+                "title": "API对话",
+                "conversationId": "e0ba0f120b0b4c6183054d854cce0a7e",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596475,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:35:06",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:35:10",
+                "title": "API对话",
+                "conversationId": "6eb22509391744b5935f3245370563f0",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596447,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:34:38",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:34:41",
+                "title": "API对话",
+                "conversationId": "1aa97210f7a2460895737f00a869a2b3",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596081,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:29:14",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:30:35",
+                "title": "API对话",
+                "conversationId": "65653c68e17244ebbffa2948bd114343",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596041,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:28:26",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:28:47",
+                "title": "API对话",
+                "conversationId": "4cca8cce5925481691cdc34fd70eb668",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4596002,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:27:20",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:27:47",
+                "title": "API对话",
+                "conversationId": "231e555e2a0e46cea42c34b688eb49da",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4595937,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:25:50",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:26:18",
+                "title": "API对话",
+                "conversationId": "28cff60676e2489a8d3c5e35de5045e7",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4595860,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:24:24",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:24:52",
+                "title": "API对话",
+                "conversationId": "7ab72a10527c4810ac7263d53ed0bb68",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4595830,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:23:48",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:24:08",
+                "title": "API对话",
+                "conversationId": "4f67d1804ffb44a8a76e37b484d3a914",
+                "deleteFlag": 0,
+                "type": "chat"
+            },
+            {
+                "id": 4595767,
+                "creator": "2676228670",
+                "createTime": "2026-06-01 14:22:10",
+                "updater": "2676228670",
+                "updateTime": "2026-06-01 14:22:25",
+                "title": "API对话",
+                "conversationId": "105f3a5ad171495b98d23a9ce455aaa8",
+                "deleteFlag": 0,
+                "type": "chat"
+            }
+        ]
+    }
+}

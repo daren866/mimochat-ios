@@ -6,10 +6,69 @@ struct Message: Identifiable {
     let isUser: Bool
 }
 
-struct ChatRecord: Identifiable {
-    let id = UUID()
+struct ChatRecord: Identifiable, Codable {
+    let id: UUID
     let title: String
-    let messages: [Message]
+    let conversationId: String
+    let createTime: String
+    let updateTime: String
+    let creator: String
+    let updater: String
+    let deleteFlag: Int
+    let type: String
+    
+    enum CodingKeys: String, CodingKey {
+        case title
+        case conversationId
+        case createTime
+        case updateTime
+        case creator
+        case updater
+        case deleteFlag
+        case type
+    }
+    
+    init(title: String, conversationId: String, createTime: String, updateTime: String, creator: String, updater: String, deleteFlag: Int, type: String) {
+        self.id = UUID()
+        self.title = title
+        self.conversationId = conversationId
+        self.createTime = createTime
+        self.updateTime = updateTime
+        self.creator = creator
+        self.updater = updater
+        self.deleteFlag = deleteFlag
+        self.type = type
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = UUID()
+        title = try container.decode(String.self, forKey: .title)
+        conversationId = try container.decode(String.self, forKey: .conversationId)
+        createTime = try container.decode(String.self, forKey: .createTime)
+        updateTime = try container.decode(String.self, forKey: .updateTime)
+        creator = try container.decode(String.self, forKey: .creator)
+        updater = try container.decode(String.self, forKey: .updater)
+        deleteFlag = try container.decode(Int.self, forKey: .deleteFlag)
+        type = try container.decode(String.self, forKey: .type)
+    }
+}
+
+struct ChatListResponse: Codable {
+    let code: Int
+    let msg: String
+    let data: ChatListData
+}
+
+struct ChatListData: Codable {
+    let total: Int
+    let pageNum: Int
+    let dataList: [ChatRecord]
+}
+
+struct PageInfo: Codable {
+    let pageNum: Int
+    let pageSize: Int
 }
 
 struct ContentView: View {
@@ -19,12 +78,8 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showChatHistory = false
     @State private var mimoToken = ""
-    @State private var chatRecords: [ChatRecord] = [
-        ChatRecord(title: "芒果西瓜对抗", messages: []),
-        ChatRecord(title: "芒果西瓜对抗", messages: []),
-        ChatRecord(title: "芒果西瓜对抗", messages: []),
-        ChatRecord(title: "芒果西瓜对抗", messages: []),
-    ]
+    @State private var chatRecords: [ChatRecord] = []
+    @State private var isLoading = false
     
     var body: some View {
         if showChat {
@@ -34,7 +89,8 @@ struct ContentView: View {
                 showSettings: $showSettings,
                 showChatHistory: $showChatHistory,
                 mimoToken: $mimoToken,
-                chatRecords: $chatRecords
+                chatRecords: $chatRecords,
+                loadChatRecords: loadChatRecords
             )
         } else {
             WelcomeView(
@@ -43,7 +99,8 @@ struct ContentView: View {
                 showSettings: $showSettings,
                 showChatHistory: $showChatHistory,
                 mimoToken: $mimoToken,
-                chatRecords: $chatRecords
+                chatRecords: $chatRecords,
+                loadChatRecords: loadChatRecords
             )
         }
     }
@@ -52,13 +109,67 @@ struct ContentView: View {
         if !inputText.trimmingCharacters(in: .whitespaces).isEmpty {
             messages.append(Message(text: inputText, isUser: true))
             messages.append(Message(text: "你好有什么可以帮助的吗?", isUser: false))
-            chatRecords.insert(ChatRecord(title: inputText, messages: messages), at: 0)
-            if chatRecords.count > 4 {
-                chatRecords.removeLast()
-            }
             showChat = true
             inputText = ""
         }
+    }
+    
+    private func loadChatRecords() {
+        guard !mimoToken.isEmpty else { return }
+        
+        isLoading = true
+        
+        let url = URL(string: "https://aistudio.xiaomimimo.com/open-apis/chat/conversation/list?xiaomichatbot_ph=ELjE%2FJoWhAXG%2ByRH0Qx%2BDw%3D%3D")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("*/*", forHTTPHeaderField: "accept")
+        request.setValue("system", forHTTPHeaderField: "accept-language")
+        request.setValue("no-cache", forHTTPHeaderField: "cache-control")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue("no-cache", forHTTPHeaderField: "pragma")
+        request.setValue("u=1, i", forHTTPHeaderField: "priority")
+        request.setValue("Etc/GMT-8", forHTTPHeaderField: "x-timezone")
+        request.setValue(mimoToken, forHTTPHeaderField: "cookie")
+        request.setValue("https://aistudio.xiaomimimo.com/", forHTTPHeaderField: "Referer")
+        
+        let pageInfo = PageInfo(pageNum: 1, pageSize: 20)
+        let body = ["pageInfo": pageInfo]
+        
+        do {
+            let encoder = JSONEncoder()
+            request.httpBody = try encoder.encode(body)
+        } catch {
+            print("Failed to serialize request body: \(error)")
+            isLoading = false
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                isLoading = false
+                
+                if let error = error {
+                    print("Request failed: \(error)")
+                    return
+                }
+                
+                guard let data = data else {
+                    print("No data received")
+                    return
+                }
+                
+                do {
+                    let decoder = JSONDecoder()
+                    let response = try decoder.decode(ChatListResponse.self, from: data)
+                    if response.code == 0 {
+                        chatRecords = Array(response.data.dataList.prefix(4))
+                    }
+                } catch {
+                    print("Failed to decode response: \(error)")
+                    print("Response data: \(String(data: data, encoding: .utf8) ?? "N/A")")
+                }
+            }
+        }.resume()
     }
 }
 
@@ -69,6 +180,7 @@ struct WelcomeView: View {
     @Binding var showChatHistory: Bool
     @Binding var mimoToken: String
     @Binding var chatRecords: [ChatRecord]
+    let loadChatRecords: () -> Void
     
     var body: some View {
         ZStack {
@@ -148,7 +260,8 @@ struct WelcomeView: View {
             if showChatHistory {
                 ChatHistoryView(
                     showChatHistory: $showChatHistory,
-                    chatRecords: $chatRecords
+                    chatRecords: $chatRecords,
+                    loadChatRecords: loadChatRecords
                 )
             }
         }
@@ -162,6 +275,7 @@ struct ChatView: View {
     @Binding var showChatHistory: Bool
     @Binding var mimoToken: String
     @Binding var chatRecords: [ChatRecord]
+    let loadChatRecords: () -> Void
     
     var body: some View {
         ZStack {
@@ -237,7 +351,8 @@ struct ChatView: View {
             if showChatHistory {
                 ChatHistoryView(
                     showChatHistory: $showChatHistory,
-                    chatRecords: $chatRecords
+                    chatRecords: $chatRecords,
+                    loadChatRecords: loadChatRecords
                 )
             }
         }
@@ -381,6 +496,7 @@ struct TokenSettingView: View {
 struct ChatHistoryView: View {
     @Binding var showChatHistory: Bool
     @Binding var chatRecords: [ChatRecord]
+    let loadChatRecords: () -> Void
     
     var body: some View {
         ZStack {
@@ -426,6 +542,9 @@ struct ChatHistoryView: View {
             .padding(.horizontal, 20)
             .padding(.top, 80)
             .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .onAppear {
+            loadChatRecords()
         }
     }
 }
