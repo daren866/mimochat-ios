@@ -2,11 +2,35 @@ import SwiftUI
 
 // MARK: - 数据模型
 
+struct TokenUsage: Codable {
+    let promptTokens: Int
+    let completionTokens: Int
+    let totalTokens: Int
+    let nativeUsage: NativeUsage
+}
+
+struct NativeUsage: Codable {
+    let completion_tokens: Int
+    let prompt_tokens: Int
+    let total_tokens: Int
+    let prompt_tokens_details: PromptTokensDetails
+    let completion_tokens_details: CompletionTokensDetails
+}
+
+struct PromptTokensDetails: Codable {
+    let cached_tokens: Int
+}
+
+struct CompletionTokensDetails: Codable {
+    let reasoning_tokens: Int
+}
+
 struct Message: Identifiable {
     let id = UUID()
     var text: String
     let isUser: Bool
     let timestamp: Date
+    var tokenUsage: TokenUsage?
 
     init(text: String, isUser: Bool) {
         self.text = text
@@ -296,7 +320,8 @@ class NetworkManager {
     func sendChatMessage(token: String, message: String, conversationId: String,
                          onMessage: @escaping (String) -> Void,
                          onFinish: @escaping () -> Void,
-                         onError: @escaping (Error) -> Void) {
+                         onError: @escaping (Error) -> Void,
+                         onUsage: ((TokenUsage) -> Void)? = nil) {
         let urlString = "\(baseURL)/bot/chat?xiaomichatbot_ph=\(ph)"
         guard let url = URL(string: urlString) else {
             onError(NSError(domain: "NetworkManager", code: -1,
@@ -343,7 +368,7 @@ class NetworkManager {
         }
 
         let configuration = URLSessionConfiguration.default
-        let session = URLSession(configuration: configuration, delegate: SSESessionDelegate(onMessage: onMessage, onFinish: onFinish, onError: onError), delegateQueue: nil)
+        let session = URLSession(configuration: configuration, delegate: SSESessionDelegate(onMessage: onMessage, onFinish: onFinish, onError: onError, onUsage: onUsage), delegateQueue: nil)
         let task = session.dataTask(with: request)
         task.resume()
     }
@@ -420,14 +445,16 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
     private let onMessage: (String) -> Void
     private let onFinish: () -> Void
     private let onError: (Error) -> Void
+    private let onUsage: ((TokenUsage) -> Void)?
     private var rawDataBuffer = Data()
     private var eventBuffer = ""
     private var currentEvent = ""
     
-    init(onMessage: @escaping (String) -> Void, onFinish: @escaping () -> Void, onError: @escaping (Error) -> Void) {
+    init(onMessage: @escaping (String) -> Void, onFinish: @escaping () -> Void, onError: @escaping (Error) -> Void, onUsage: ((TokenUsage) -> Void)? = nil) {
         self.onMessage = onMessage
         self.onFinish = onFinish
         self.onError = onError
+        self.onUsage = onUsage
     }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
@@ -466,9 +493,21 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
                 if let content = parseAndExtractContent(from: dataContent) {
                     DispatchQueue.main.async { self.onMessage(content) }
                 }
+            } else if currentEvent == "usage" {
+                parseUsageData(dataContent)
             } else if currentEvent == "finish" {
                 DispatchQueue.main.async { self.onFinish() }
             }
+        }
+    }
+    
+    private func parseUsageData(_ dataString: String) {
+        guard !dataString.isEmpty, let jsonData = dataString.data(using: .utf8), let usage = try? JSONDecoder().decode(TokenUsage.self, from: jsonData) else {
+            print("Failed to parse usage data")
+            return
+        }
+        DispatchQueue.main.async {
+            self.onUsage?(usage)
         }
     }
     
@@ -676,6 +715,13 @@ struct ContentView: View {
                         self.isLoading = false
                         if messageIndex < self.messages.count {
                             self.messages[messageIndex].text = "请求失败：\(error.localizedDescription)"
+                        }
+                    }
+                },
+                onUsage: { usage in
+                    DispatchQueue.main.async {
+                        if messageIndex < self.messages.count {
+                            self.messages[messageIndex].tokenUsage = usage
                         }
                     }
                 }
@@ -1030,6 +1076,13 @@ struct ChatView: View {
                         self.isLoading = false
                         if messageIndex < self.messages.count {
                             self.messages[messageIndex].text = "请求失败：\(error.localizedDescription)"
+                        }
+                    }
+                },
+                onUsage: { usage in
+                    DispatchQueue.main.async {
+                        if messageIndex < self.messages.count {
+                            self.messages[messageIndex].tokenUsage = usage
                         }
                     }
                 }
@@ -1411,6 +1464,7 @@ struct ChatHistoryView: View {
 
 struct MessageBubble: View {
     let message: Message
+    @State private var showActionSheet = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -1434,10 +1488,101 @@ struct MessageBubble: View {
                         .foregroundColor(.black)
                         .cornerRadius(16)
                 }
+                .contextMenu {
+                    Button("复制") {
+                        UIPasteboard.general.string = message.text
+                    }
+                    if message.tokenUsage != nil {
+                        Button("消耗token") {
+                            showActionSheet = true
+                        }
+                    }
+                }
 
                 Spacer(minLength: 50)
             }
         }
+        .sheet(isPresented: $showActionSheet) {
+            TokenUsageDetailView(usage: message.tokenUsage!)
+        }
+    }
+}
+
+// MARK: - TokenUsageDetailView
+
+struct TokenUsageDetailView: View {
+    let usage: TokenUsage
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    Text("Token 使用详情")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .padding(.top, 20)
+
+                    VStack(spacing: 16) {
+                        TokenInfoRow(title: "提示词 Token", value: "\(usage.promptTokens)")
+                        TokenInfoRow(title: "响应 Token", value: "\(usage.completionTokens)")
+                        TokenInfoRow(title: "总 Token", value: "\(usage.totalTokens)")
+
+                        Divider()
+
+                        Text("Native Usage")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+
+                        TokenInfoRow(title: "提示词 Tokens", value: "\(usage.nativeUsage.prompt_tokens)")
+                        TokenInfoRow(title: "响应 Tokens", value: "\(usage.nativeUsage.completion_tokens)")
+                        TokenInfoRow(title: "总 Tokens", value: "\(usage.nativeUsage.total_tokens)")
+
+                        Divider()
+
+                        Text("详细信息")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+
+                        TokenInfoRow(title: "缓存 Tokens", value: "\(usage.nativeUsage.prompt_tokens_details.cached_tokens)")
+                        TokenInfoRow(title: "推理 Tokens", value: "\(usage.nativeUsage.completion_tokens_details.reasoning_tokens)")
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("关闭") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    @Environment(\.presentationMode) private var presentationMode
+}
+
+struct TokenInfoRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.gray)
+            Spacer()
+            Text(value)
+                .font(.headline)
+                .foregroundColor(.black)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
     }
 }
 
