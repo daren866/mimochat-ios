@@ -538,23 +538,23 @@ struct ContentView: View {
     var body: some View {
         Group {
             if showChat {
-                ChatView(
-                    messages: $messages,
-                    inputText: $inputText,
-                    showSettings: $showSettings,
-                    showChatHistory: $showChatHistory,
-                    mimoToken: $mimoToken,
-                    chatRecords: $chatRecords,
-                    isLoading: $isLoading,
-                    currentConversationId: $currentConversationId,
-                    loadChatRecords: loadChatRecords,
-                    saveToken: saveToken,
-                    selectChatRecord: selectChatRecord,
-                    typeText: typeText,
-                    saveConversationId: saveConversationId,
-                    deleteAllChatRecords: deleteAllChatRecords
-                )
-            } else {
+            ChatView(
+                messages: $messages,
+                inputText: $inputText,
+                showSettings: $showSettings,
+                showChatHistory: $showChatHistory,
+                mimoToken: $mimoToken,
+                chatRecords: $chatRecords,
+                isLoading: $isLoading,
+                currentConversationId: $currentConversationId,
+                loadChatRecords: loadChatRecords,
+                saveToken: saveToken,
+                selectChatRecord: selectChatRecord,
+                appendText: appendText,
+                saveConversationId: saveConversationId,
+                deleteAllChatRecords: deleteAllChatRecords
+            )
+        } else {
                 WelcomeView(
                     inputText: $inputText,
                     onSend: sendMessage,
@@ -595,13 +595,10 @@ struct ContentView: View {
         UserDefaults.standard.set(id, forKey: conversationIdKey)
     }
     
-    private func typeText(_ text: String, at index: Int) {
-        let characters = Array(text)
-        for (i, char) in characters.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
-                if index < self.messages.count {
-                    self.messages[index].text.append(char)
-                }
+    private func appendText(_ text: String, at index: Int) {
+        DispatchQueue.main.async {
+            if index < self.messages.count {
+                self.messages[index].text.append(text)
             }
         }
     }
@@ -667,11 +664,7 @@ struct ContentView: View {
                 message: trimmed,
                 conversationId: convId,
                 onMessage: { content in
-                    DispatchQueue.main.async {
-                        if messageIndex < self.messages.count {
-                            self.typeText(content, at: messageIndex)
-                        }
-                    }
+                    self.appendText(content, at: messageIndex)
                 },
                 onFinish: {
                     DispatchQueue.main.async {
@@ -884,7 +877,7 @@ struct ChatView: View {
     let loadChatRecords: () -> Void
     let saveToken: (String) -> Void
     let selectChatRecord: (String) -> Void
-    let typeText: (String, Int) -> Void
+    let appendText: (String, Int) -> Void
     let saveConversationId: (String) -> Void
     let deleteAllChatRecords: () -> Void
 
@@ -1025,11 +1018,7 @@ struct ChatView: View {
                 message: trimmed,
                 conversationId: convId,
                 onMessage: { content in
-                    DispatchQueue.main.async {
-                        if messageIndex < self.messages.count {
-                            typeText(content, messageIndex)
-                        }
-                    }
+                    appendText(content, messageIndex)
                 },
                 onFinish: {
                     DispatchQueue.main.async {
