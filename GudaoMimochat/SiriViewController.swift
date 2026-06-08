@@ -234,7 +234,9 @@ class SiriViewController: UIViewController {
         if trimmedText.isEmpty {
             showChatInterface(isEmptyResult: true)
         } else {
-            showChatInterface(isEmptyResult: false, userText: trimmedText, aiText: "你好，我可以：\n看电视\n搜索新闻\n运行代码\n哦~")
+            // 自动发送内容，不需要用户确认
+            showChatInterface(isEmptyResult: false, userText: trimmedText, aiText: "AI正在处理...")
+            sendToMimo(trimmedText)
         }
     }
     
