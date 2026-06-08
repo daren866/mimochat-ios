@@ -547,7 +547,8 @@ struct ContentView: View {
                     saveToken: saveToken,
                     selectChatRecord: selectChatRecord,
                     typeText: typeText,
-                    saveConversationId: saveConversationId
+                    saveConversationId: saveConversationId,
+                    deleteAllChatRecords: deleteAllChatRecords
                 )
             } else {
                 WelcomeView(
@@ -561,7 +562,8 @@ struct ContentView: View {
                     errorMessage: $errorMessage,
                     loadChatRecords: loadChatRecords,
                     saveToken: saveToken,
-                    selectChatRecord: selectChatRecord
+                    selectChatRecord: selectChatRecord,
+                    deleteAllChatRecords: deleteAllChatRecords
                 )
             }
         }
@@ -764,6 +766,7 @@ struct WelcomeView: View {
     let loadChatRecords: () -> Void
     let saveToken: (String) -> Void
     let selectChatRecord: (String) -> Void
+    let deleteAllChatRecords: () -> Void
 
     var body: some View {
         ZStack {
@@ -879,6 +882,7 @@ struct ChatView: View {
     let selectChatRecord: (String) -> Void
     let typeText: (String, Int) -> Void
     let saveConversationId: (String) -> Void
+    let deleteAllChatRecords: () -> Void
 
     var body: some View {
         ZStack {
