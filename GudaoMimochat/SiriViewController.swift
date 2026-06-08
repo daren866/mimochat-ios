@@ -6,7 +6,7 @@ class SiriViewController: UIViewController {
     private let backgroundView = UIView()
     private let contentView = UIView()
     private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
+    private let userInputHintLabel = UILabel() // 新增：用户输入提示
     private let settingsButton = UIButton(type: .system)
     
     private let chatContainerView = UIView()
@@ -18,7 +18,7 @@ class SiriViewController: UIViewController {
     private let inputTextField = UITextField()
     private let sendButton = UIButton(type: .system)
     
-    private let speakButton = UIButton(type: .system)
+    private let speakButton = UIButton(type: .system) // 修改：长按输入语音按钮
     
     private var messages: [Message] = []
     private var isListening = false
@@ -30,7 +30,7 @@ class SiriViewController: UIViewController {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine: AVAudioEngine?
     
-    // 新增：用于保存实时识别到的文本，以便在点击停止时获取
+    // 新增：用于保存实时识别到的文本
     private var currentTranscript: String = ""
     
     private let tokenKey = "mimoCookieToken"
@@ -68,13 +68,21 @@ class SiriViewController: UIViewController {
         contentView.clipsToBounds = true
         view.addSubview(contentView)
         
-        // 修改：标题移至左上角
+        // 标题移至左上角
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.text = "Mimo siri"
         titleLabel.font = UIFont.systemFont(ofSize: 24, weight: .bold)
         titleLabel.textColor = .black
         titleLabel.textAlignment = .left
         contentView.addSubview(titleLabel)
+        
+        // 用户输入提示
+        userInputHintLabel.translatesAutoresizingMaskIntoConstraints = false
+        userInputHintLabel.text = "用户输入，不支持多行"
+        userInputHintLabel.font = UIFont.systemFont(ofSize: 14)
+        userInputHintLabel.textColor = .gray
+        userInputHintLabel.textAlignment = .left
+        contentView.addSubview(userInputHintLabel)
         
         settingsButton.translatesAutoresizingMaskIntoConstraints = false
         settingsButton.setImage(UIImage(systemName: "gear"), for: .normal)
@@ -89,8 +97,9 @@ class SiriViewController: UIViewController {
         subtitleLabel.textAlignment = .center
         contentView.addSubview(subtitleLabel)
         
+        // 长按输入语音按钮
         speakButton.translatesAutoresizingMaskIntoConstraints = false
-        speakButton.setTitle("按我说话", for: .normal)
+        speakButton.setTitle("长按输入语音", for: .normal)
         speakButton.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
         speakButton.setTitleColor(.black, for: .normal)
         speakButton.backgroundColor = .white
@@ -98,6 +107,9 @@ class SiriViewController: UIViewController {
         speakButton.layer.borderWidth = 2
         speakButton.layer.borderColor = UIColor.black.cgColor
         speakButton.addTarget(self, action: #selector(toggleListening), for: .touchUpInside)
+        // 添加长按手势
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
+        speakButton.addGestureRecognizer(longPressGesture)
         contentView.addSubview(speakButton)
         
         chatContainerView.translatesAutoresizingMaskIntoConstraints = false
@@ -149,16 +161,20 @@ class SiriViewController: UIViewController {
             contentView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
             
-            // 修改：标题左对齐并添加左侧边距
+            // 标题左对齐并添加左侧边距
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            
+            // 用户输入提示
+            userInputHintLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            userInputHintLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             
             settingsButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             settingsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             settingsButton.widthAnchor.constraint(equalToConstant: 44),
             settingsButton.heightAnchor.constraint(equalToConstant: 44),
             
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
+            subtitleLabel.topAnchor.constraint(equalTo: userInputHintLabel.bottomAnchor, constant: 12),
             subtitleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             
             speakButton.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 20),
@@ -295,7 +311,7 @@ class SiriViewController: UIViewController {
         recognitionRequest = nil
         isListening = false
         subtitleLabel.text = "语音听写已开启"
-        speakButton.setTitle("按我说话", for: .normal)
+        speakButton.setTitle("长按输入语音", for: .normal)
     }
     
     private func handleRecognitionResult(_ text: String) {
@@ -518,6 +534,14 @@ class SiriViewController: UIViewController {
             stopListening()
         } else {
             startListening()
+        }
+    }
+    
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        if gesture.state == .began {
+            startListening()
+        } else if gesture.state == .ended {
+            stopListening()
         }
     }
     
