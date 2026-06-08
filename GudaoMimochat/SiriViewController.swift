@@ -68,11 +68,12 @@ class SiriViewController: UIViewController {
         contentView.clipsToBounds = true
         view.addSubview(contentView)
         
+        // 修改：标题移至左上角
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text = "有什么问题，请说"
+        titleLabel.text = "Mimo siri"
         titleLabel.font = UIFont.systemFont(ofSize: 24, weight: .bold)
         titleLabel.textColor = .black
-        titleLabel.textAlignment = .center
+        titleLabel.textAlignment = .left
         contentView.addSubview(titleLabel)
         
         settingsButton.translatesAutoresizingMaskIntoConstraints = false
@@ -148,8 +149,9 @@ class SiriViewController: UIViewController {
             contentView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
             
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40),
-            titleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            // 修改：标题左对齐并添加左侧边距
+            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             
             settingsButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             settingsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
@@ -324,61 +326,54 @@ class SiriViewController: UIViewController {
     }
     
     private func addMessage(_ text: String, isUser: Bool) {
+        let messageView = UIView()
+        messageView.translatesAutoresizingMaskIntoConstraints = false
+        messageView.layer.cornerRadius = 16
+        messageView.clipsToBounds = true
+        
         let messageLabel = UILabel()
         messageLabel.text = text
         messageLabel.font = UIFont.systemFont(ofSize: 16)
         messageLabel.numberOfLines = 0
         messageLabel.lineBreakMode = .byWordWrapping
-        
-        let messageView = UIView()
-        messageView.translatesAutoresizingMaskIntoConstraints = false
         messageLabel.translatesAutoresizingMaskIntoConstraints = false
-        messageView.addSubview(messageLabel)
         
         if isUser {
             messageLabel.textColor = .white
             messageView.backgroundColor = .blue
-            messageView.layer.cornerRadius = 16
-            NSLayoutConstraint.activate([
-                messageLabel.topAnchor.constraint(equalTo: messageView.topAnchor, constant: 12),
-                messageLabel.leadingAnchor.constraint(equalTo: messageView.leadingAnchor, constant: 16),
-                messageLabel.trailingAnchor.constraint(equalTo: messageView.trailingAnchor, constant: -16),
-                messageLabel.bottomAnchor.constraint(equalTo: messageView.bottomAnchor, constant: -12),
-                messageLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 250)
-            ])
-            
-            let container = UIView()
-            container.translatesAutoresizingMaskIntoConstraints = false
-            container.addSubview(messageView)
+        } else {
+            messageLabel.textColor = .black
+            messageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
+        }
+        
+        messageView.addSubview(messageLabel)
+        NSLayoutConstraint.activate([
+            messageLabel.topAnchor.constraint(equalTo: messageView.topAnchor, constant: 12),
+            messageLabel.leadingAnchor.constraint(equalTo: messageView.leadingAnchor, constant: 16),
+            messageLabel.trailingAnchor.constraint(equalTo: messageView.trailingAnchor, constant: -16),
+            messageLabel.bottomAnchor.constraint(equalTo: messageView.bottomAnchor, constant: -12),
+            messageLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 250)
+        ])
+        
+        let container = UIView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(messageView)
+        
+        if isUser {
             NSLayoutConstraint.activate([
                 messageView.topAnchor.constraint(equalTo: container.topAnchor),
                 messageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
                 container.heightAnchor.constraint(equalTo: messageView.heightAnchor)
             ])
-            messagesStackView.addArrangedSubview(container)
         } else {
-            messageLabel.textColor = .black
-            messageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
-            messageView.layer.cornerRadius = 16
-            NSLayoutConstraint.activate([
-                messageLabel.topAnchor.constraint(equalTo: messageView.topAnchor, constant: 12),
-                messageLabel.leadingAnchor.constraint(equalTo: messageView.leadingAnchor, constant: 16),
-                messageLabel.trailingAnchor.constraint(equalTo: messageView.trailingAnchor, constant: -16),
-                messageLabel.bottomAnchor.constraint(equalTo: messageView.bottomAnchor, constant: -12),
-                messageLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 250)
-            ])
-            
-            let container = UIView()
-            container.translatesAutoresizingMaskIntoConstraints = false
-            container.addSubview(messageView)
             NSLayoutConstraint.activate([
                 messageView.topAnchor.constraint(equalTo: container.topAnchor),
                 messageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
                 container.heightAnchor.constraint(equalTo: messageView.heightAnchor)
             ])
-            messagesStackView.addArrangedSubview(container)
         }
         
+        messagesStackView.addArrangedSubview(container)
         messages.append(Message(text: text, isUser: isUser))
         
         DispatchQueue.main.async {
@@ -519,7 +514,6 @@ class SiriViewController: UIViewController {
     
     @objc private func toggleListening() {
         if isListening {
-            // 修改：点击停止时，直接使用缓存的实时识别文本处理
             handleRecognitionResult(currentTranscript)
             stopListening()
         } else {
