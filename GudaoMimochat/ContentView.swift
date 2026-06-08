@@ -4,7 +4,7 @@ import SwiftUI
 
 struct Message: Identifiable {
     let id = UUID()
-    let text: String
+    var text: String
     let isUser: Bool
     let timestamp: Date
 
