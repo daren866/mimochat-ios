@@ -16,6 +16,18 @@ jobs:
       with:
         xcode-version: 'latest'
 
+    - name: Install Tuist
+      run: |
+        echo "🔧 安装 Tuist..."
+        curl -Ls https://install.tuist.io | bash
+        echo "✅ Tuist 安装完成"
+
+    - name: Generate Xcode Project
+      run: |
+        echo "🔧 使用 Tuist 生成 Xcode 项目..."
+        tuist generate --no-open
+        echo "✅ Xcode 项目生成完成"
+
     - name: Build Xcode Archive
       run: |
         # 使用GudaoMimochat作为主要Scheme名称
