@@ -75,6 +75,33 @@ struct PageInfo: Codable {
     let pageSize: Int
 }
 
+struct DialogItem: Codable {
+    let conversationId: String
+    let msgId: String
+    let inputInfo: InputInfo
+    let createTime: String
+    let updateTime: String
+    let dialogLogDetailList: [DialogLogDetail]
+}
+
+struct InputInfo: Codable {
+    let query: String
+    let multiMedias: [String]
+}
+
+struct DialogLogDetail: Codable {
+    let id: Int
+    let result: String
+    let dialogStatus: String
+    let model: String
+}
+
+struct DialogListResponse: Codable {
+    let code: Int
+    let msg: String
+    let data: [DialogItem]
+}
+
 struct SendMessageResponse: Codable {
     let code: Int
     let msg: String
@@ -183,6 +210,43 @@ class NetworkManager {
             }
         }.resume()
     }
+    
+    // MARK: - 获取对话详情
+    func fetchDialogList(token: String, conversationId: String, completion: @escaping (Result<[DialogItem], Error>) -> Void) {
+        var request = baseRequest(path: "chat/dialog/list", token: token)
+        let body: [String: Any] = [
+            "queryParam": ["conversationId": conversationId],
+            "pageInfo": ["pageNum": 1, "pageSize": 10]
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "NetworkManager", code: -1,
+                                               userInfo: [NSLocalizedDescriptionKey: "无数据返回"])))
+                }
+                return
+            }
+            do {
+                let resp = try JSONDecoder().decode(DialogListResponse.self, from: data)
+                if resp.code == 0 {
+                    DispatchQueue.main.async { completion(.success(resp.data)) }
+                } else {
+                    DispatchQueue.main.async {
+                        completion(.failure(NSError(domain: "API", code: resp.code,
+                                                   userInfo: [NSLocalizedDescriptionKey: resp.msg])))
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }.resume()
+    }
 
     // MARK: - 创建对话
     func createConversation(token: String, conversationId: String, completion: @escaping (Result<String, Error>) -> Void) {
@@ -272,46 +336,10 @@ class NetworkManager {
             return
         }
 
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async { onError(error) }
-                return
-            }
-            
-            guard let data = data else {
-                DispatchQueue.main.async {
-                    onError(NSError(domain: "NetworkManager", code: -1,
-                                   userInfo: [NSLocalizedDescriptionKey: "无数据返回"]))
-                }
-                return
-            }
-
-            if let responseString = String(data: data, encoding: .utf8) {
-                self.parseSSEStream(responseString, onMessage: onMessage, onFinish: onFinish)
-            }
-        }
+        let configuration = URLSessionConfiguration.default
+        let session = URLSession(configuration: configuration, delegate: SSESessionDelegate(onMessage: onMessage, onFinish: onFinish, onError: onError), delegateQueue: nil)
+        let task = session.dataTask(with: request)
         task.resume()
-    }
-
-    private func parseSSEStream(_ response: String, onMessage: @escaping (String) -> Void, onFinish: @escaping () -> Void) {
-        let lines = response.components(separatedBy: "\n")
-        var currentEvent = ""
-        
-        for line in lines {
-            if line.hasPrefix("event:") {
-                currentEvent = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-            } else if line.hasPrefix("data:") {
-                let dataContent = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-                
-                if currentEvent == "message" {
-                    if let content = extractContent(from: dataContent) {
-                        DispatchQueue.main.async { onMessage(content) }
-                    }
-                } else if currentEvent == "finish" {
-                    DispatchQueue.main.async { onFinish() }
-                }
-            }
-        }
     }
 
     private func extractContent(from data: String) -> String? {
@@ -322,12 +350,119 @@ class NetworkManager {
                let type = json["type"] as? String,
                type == "text",
                let content = json["content"] as? String {
-                return content
+                return filterContent(content)
             }
         } catch {
             print("Failed to parse SSE data: \(error)")
         }
         return nil
+    }
+    
+    private func filterContent(_ content: String) -> String {
+        if content == "<think>" {
+            return ""
+        }
+        if content.hasPrefix("<think>") {
+            if let endIndex = content.range(of: "</think>")?.upperBound {
+                return String(content[endIndex...])
+            }
+            return ""
+        }
+        if content.contains("</think>") {
+            if let closeIndex = content.range(of: "</think>")?.upperBound {
+                return String(content[closeIndex...])
+            }
+        }
+        return content
+    }
+}
+
+class SSESessionDelegate: NSObject, URLSessionDataDelegate {
+    private let onMessage: (String) -> Void
+    private let onFinish: () -> Void
+    private let onError: (Error) -> Void
+    private var buffer = ""
+    private var currentEvent = ""
+    
+    init(onMessage: @escaping (String) -> Void, onFinish: @escaping () -> Void, onError: @escaping (Error) -> Void) {
+        self.onMessage = onMessage
+        self.onFinish = onFinish
+        self.onError = onError
+    }
+    
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        if let newString = String(data: data, encoding: .utf8) {
+            buffer += newString
+            processBuffer()
+        }
+    }
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        session.finishTasksAndInvalidate()
+        if let error = error {
+            DispatchQueue.main.async { self.onError(error) }
+        } else {
+            processBuffer()
+            DispatchQueue.main.async { self.onFinish() }
+        }
+    }
+    
+    private func processBuffer() {
+        while let lineEndIndex = buffer.firstIndex(of: "\n") {
+            let line = String(buffer[..<lineEndIndex])
+            buffer = String(buffer[buffer.index(after: lineEndIndex)...])
+            processLine(line)
+        }
+    }
+    
+    private func processLine(_ line: String) {
+        if line.hasPrefix("event:") {
+            currentEvent = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+        } else if line.hasPrefix("data:") {
+            let dataContent = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            
+            if currentEvent == "message" {
+                if let content = extractContent(from: dataContent) {
+                    DispatchQueue.main.async { self.onMessage(content) }
+                }
+            } else if currentEvent == "finish" {
+                DispatchQueue.main.async { self.onFinish() }
+            }
+        }
+    }
+    
+    private func extractContent(from data: String) -> String? {
+        guard let jsonData = data.data(using: .utf8) else { return nil }
+        
+        do {
+            if let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let type = json["type"] as? String,
+               type == "text",
+               let content = json["content"] as? String {
+                return filterContent(content)
+            }
+        } catch {
+            print("Failed to parse SSE data: \(error)")
+        }
+        return nil
+    }
+    
+    private func filterContent(_ content: String) -> String {
+        if content == "<think>" {
+            return ""
+        }
+        if content.hasPrefix("<think>") {
+            if let endIndex = content.range(of: "</think>")?.upperBound {
+                return String(content[endIndex...])
+            }
+            return ""
+        }
+        if content.contains("</think>") {
+            if let closeIndex = content.range(of: "</think>")?.upperBound {
+                return String(content[closeIndex...])
+            }
+        }
+        return content
     }
 }
 
@@ -345,6 +480,7 @@ struct ContentView: View {
     @State private var currentConversationId: String?
     @State private var errorMessage: String?
     private let tokenKey = "mimoCookieToken"
+    private let conversationIdKey = "mimoConversationId"
 
     var body: some View {
         Group {
@@ -390,6 +526,59 @@ struct ContentView: View {
         if let savedToken = UserDefaults.standard.string(forKey: tokenKey) {
             mimoToken = savedToken
         }
+        if let savedConversationId = UserDefaults.standard.string(forKey: conversationIdKey) {
+            currentConversationId = savedConversationId
+        }
+    }
+    
+    private func saveConversationId(_ id: String) {
+        currentConversationId = id
+        UserDefaults.standard.set(id, forKey: conversationIdKey)
+    }
+    
+    private func typeText(_ text: String, at index: Int) {
+        let characters = Array(text)
+        for (i, char) in characters.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
+                if index < self.messages.count {
+                    self.messages[index].text.append(char)
+                }
+            }
+        }
+    }
+    
+    private func selectChatRecord(_ conversationId: String) {
+        guard !mimoToken.isEmpty else { return }
+        
+        NetworkManager.shared.fetchDialogList(token: mimoToken, conversationId: conversationId) { result in
+            switch result {
+            case .success(let dialogs):
+                DispatchQueue.main.async {
+                    self.messages.removeAll()
+                    
+                    for dialog in dialogs {
+                        self.messages.append(Message(text: dialog.inputInfo.query, isUser: true))
+                        
+                        if let detail = dialog.dialogLogDetailList.first {
+                            let content = self.filterResultContent(detail.result)
+                            self.messages.append(Message(text: content, isUser: false))
+                        }
+                    }
+                    
+                    self.saveConversationId(conversationId)
+                    self.showChat = true
+                }
+            case .failure(let error):
+                print("获取对话详情失败: \(error)")
+            }
+        }
+    }
+    
+    private func filterResultContent(_ content: String) -> String {
+        if let startIndex = content.range(of: "</think>")?.upperBound {
+            return String(content[startIndex...])
+        }
+        return content
     }
 
     private func sendMessage() {
@@ -421,7 +610,7 @@ struct ContentView: View {
                 onMessage: { content in
                     DispatchQueue.main.async {
                         if messageIndex < self.messages.count {
-                            self.messages[messageIndex].text += content
+                            self.typeText(content, at: messageIndex)
                         }
                     }
                 },
@@ -452,7 +641,7 @@ struct ContentView: View {
                 switch result {
                 case .success(let convId):
                     DispatchQueue.main.async {
-                        self.currentConversationId = convId
+                        self.saveConversationId(convId)
                         sendChat(convId)
                     }
                 case .failure(let error):
@@ -584,7 +773,8 @@ struct WelcomeView: View {
                 ChatHistoryView(
                     showChatHistory: $showChatHistory,
                     chatRecords: $chatRecords,
-                    loadChatRecords: loadChatRecords
+                    loadChatRecords: loadChatRecords,
+                    onSelectChat: selectChatRecord
                 )
             }
         }
@@ -710,7 +900,8 @@ struct ChatView: View {
                 ChatHistoryView(
                     showChatHistory: $showChatHistory,
                     chatRecords: $chatRecords,
-                    loadChatRecords: loadChatRecords
+                    loadChatRecords: loadChatRecords,
+                    onSelectChat: selectChatRecord
                 )
             }
         }
@@ -742,7 +933,7 @@ struct ChatView: View {
                 onMessage: { content in
                     DispatchQueue.main.async {
                         if messageIndex < self.messages.count {
-                            self.messages[messageIndex].text += content
+                            self.typeText(content, at: messageIndex)
                         }
                     }
                 },
@@ -773,7 +964,7 @@ struct ChatView: View {
                 switch result {
                 case .success(let convId):
                     DispatchQueue.main.async {
-                        self.currentConversationId = convId
+                        self.saveConversationId(convId)
                         sendChat(convId)
                     }
                 case .failure(let error):
@@ -980,6 +1171,7 @@ struct ChatHistoryView: View {
     @Binding var showChatHistory: Bool
     @Binding var chatRecords: [ChatRecord]
     let loadChatRecords: () -> Void
+    let onSelectChat: (String) -> Void
 
     var body: some View {
         ZStack {
@@ -1027,6 +1219,7 @@ struct ChatHistoryView: View {
                                 ForEach(chatRecords) { record in
                                     Button(action: {
                                         showChatHistory = false
+                                        onSelectChat(record.conversationId)
                                     }) {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(record.title)
