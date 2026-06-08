@@ -1,5 +1,19 @@
 import SwiftUI
 
+class AppState: ObservableObject {
+    @Published var showSiriMode = false
+    
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("OpenSiriMode"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showSiriMode = true
+        }
+    }
+}
+
 // MARK: - 数据模型
 
 struct TokenUsage: Codable {
@@ -561,12 +575,12 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
 // MARK: - ContentView
 
 struct ContentView: View {
+    @StateObject private var appState = AppState()
     @State private var inputText = ""
     @State private var messages: [Message] = []
     @State private var showChat = false
     @State private var showSettings = false
     @State private var showChatHistory = false
-    @State private var showSiriMode = false
     @State private var mimoToken = ""
     @State private var chatRecords: [ChatRecord] = []
     @State private var isLoading = false
@@ -577,10 +591,10 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if showSiriMode {
+            if appState.showSiriMode {
                 SiriModeView(
                     mimoToken: $mimoToken,
-                    onClose: { showSiriMode = false },
+                    onClose: { appState.showSiriMode = false },
                     onSend: sendMessage
                 )
             } else if showChat {
@@ -619,17 +633,6 @@ struct ContentView: View {
         }
         .onAppear {
             loadToken()
-            setupSiriModeObserver()
-        }
-    }
-    
-    private func setupSiriModeObserver() {
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("OpenSiriMode"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.showSiriMode = true
         }
     }
 
