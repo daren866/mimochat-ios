@@ -193,7 +193,7 @@ class SiriViewController: UIViewController {
                 self.handleRecognitionResult(self.currentTranscript)
             }
             
-            if error != nil || (result.isFinal ?? false) {
+            if error != nil || result.isFinal { // 修复：移除 ?? false
                 self.stopListening()
             }
         }
