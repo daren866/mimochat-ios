@@ -4,9 +4,8 @@ import Speech
 class SiriViewController: UIViewController {
     
     private let backgroundView = UIView()
-    private let bubbleContainer = UIView()
+    private let container = UIView()
     private let titleLabel = UILabel()
-    private let messageBlock = UILabel()
     private let voiceButton = UIButton(type: .system)
     
     private var messages: [Message] = []
@@ -52,42 +51,36 @@ class SiriViewController: UIViewController {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
         backgroundView.addGestureRecognizer(tapGesture)
         
-        // 气泡容器
-        bubbleContainer.translatesAutoresizingMaskIntoConstraints = false
-        bubbleContainer.backgroundColor = UIColor(hex: "#e0e0e0")
-        bubbleContainer.layer.cornerRadius = 20
-        bubbleContainer.clipsToBounds = true
-        view.addSubview(bubbleContainer)
+        // 容器 - 底部弹出的圆角矩形
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.backgroundColor = UIColor(hex: "#e0e0e0")
+        container.layer.cornerRadius = 30
+        container.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner] // 只有上边有圆角
+        container.clipsToBounds = true
+        view.addSubview(container)
         
-        // 标题标签 - "你好！"
+        // 标题标签 - "有什么需要帮助的？"
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text = "你好！"
-        titleLabel.font = UIFont.systemFont(ofSize: 16)
+        titleLabel.text = "有什么需要帮助的？"
+        titleLabel.font = UIFont.boldSystemFont(ofSize: 48)
         titleLabel.textColor = .black
-        titleLabel.textAlignment = .left
-        bubbleContainer.addSubview(titleLabel)
-        
-        // 消息文本块
-        messageBlock.translatesAutoresizingMaskIntoConstraints = false
-        messageBlock.text = "我是AI助手哦\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在"
-        messageBlock.font = UIFont.systemFont(ofSize: 20)
-        messageBlock.textColor = .black
-        messageBlock.textAlignment = .left
-        messageBlock.numberOfLines = 0
-        messageBlock.lineBreakMode = .byWordWrapping
-        bubbleContainer.addSubview(messageBlock)
+        titleLabel.textAlignment = .center
+        titleLabel.numberOfLines = 0
+        titleLabel.lineBreakMode = .byWordWrapping
+        titleLabel.lineSpacing = 1.2
+        container.addSubview(titleLabel)
         
         // 长按输入语音按钮
         voiceButton.translatesAutoresizingMaskIntoConstraints = false
         voiceButton.setTitle("长按输入语音", for: .normal)
-        voiceButton.titleLabel?.font = UIFont.systemFont(ofSize: 24, weight: .semibold)
+        voiceButton.titleLabel?.font = UIFont.systemFont(ofSize: 32)
         voiceButton.setTitleColor(.black, for: .normal)
         voiceButton.backgroundColor = UIColor(hex: "#e0e0e0")
-        voiceButton.layer.cornerRadius = 15
+        voiceButton.layer.cornerRadius = 20
         voiceButton.layer.borderWidth = 2
         voiceButton.layer.borderColor = UIColor(hex: "#666666").cgColor
         voiceButton.addTarget(self, action: #selector(handleLongPress), for: .touchUpInside)
-        bubbleContainer.addSubview(voiceButton)
+        container.addSubview(voiceButton)
         
         // 添加长按手势
         let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
@@ -99,29 +92,23 @@ class SiriViewController: UIViewController {
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 气泡容器位置：x: 0.05, y: 0.5, width: 0.9, height: 0.45
-            bubbleContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: view.bounds.width * 0.05),
-            bubbleContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -view.bounds.width * 0.05),
-            bubbleContainer.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            bubbleContainer.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.45), // 修复：使用 multiply(by:)
+            // 容器位置：x: 0, y: 0.45, width: 1.0, height: 0.55
+            container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            container.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.55),
             
-            // 标题标签位置：x: 0, y: 0, width: 1, height: 0.1
-            titleLabel.topAnchor.constraint(equalTo: bubbleContainer.topAnchor, constant: 20),
-            titleLabel.leadingAnchor.constraint(equalTo: bubbleContainer.leadingAnchor, constant: 20),
-            titleLabel.trailingAnchor.constraint(equalTo: bubbleContainer.trailingAnchor, constant: -20),
-            titleLabel.heightAnchor.constraint(equalTo: bubbleContainer.heightAnchor, multiplier: 0.1),
+            // 标题标签位置：x: 0.05, y: 0.35, width: 0.9, height: 0.2
+            titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: container.bounds.width * 0.05),
+            titleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -container.bounds.width * 0.05),
+            titleLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -container.bounds.height * 0.15),
+            titleLabel.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.2),
             
-            // 消息文本块位置：x: 0, y: 0.12, width: 1, height: 0.68
-            messageBlock.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
-            messageBlock.leadingAnchor.constraint(equalTo: bubbleContainer.leadingAnchor, constant: 20),
-            messageBlock.trailingAnchor.constraint(equalTo: bubbleContainer.trailingAnchor, constant: -20),
-            messageBlock.heightAnchor.constraint(equalTo: bubbleContainer.heightAnchor, multiplier: 0.68),
-            
-            // 按钮位置：x: 0.05, y: 0.85, width: 0.9, height: 0.15
-            voiceButton.leadingAnchor.constraint(equalTo: bubbleContainer.leadingAnchor, constant: bubbleContainer.bounds.width * 0.05),
-            voiceButton.trailingAnchor.constraint(equalTo: bubbleContainer.trailingAnchor, constant: -bubbleContainer.bounds.width * 0.05),
-            voiceButton.bottomAnchor.constraint(equalTo: bubbleContainer.bottomAnchor, constant: -bubbleContainer.bounds.height * 0.15),
-            voiceButton.heightAnchor.constraint(equalTo: bubbleContainer.heightAnchor, multiplier: 0.15)
+            // 按钮位置：x: 0.05, y: 0.85, width: 0.9, height: 0.12
+            voiceButton.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: container.bounds.width * 0.05),
+            voiceButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -container.bounds.width * 0.05),
+            voiceButton.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -container.bounds.height * 0.08),
+            voiceButton.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.12)
         ])
     }
     
@@ -223,18 +210,17 @@ class SiriViewController: UIViewController {
     
     private func showChatInterface(isEmptyResult: Bool = false) {
         if isEmptyResult {
-            messageBlock.text = "未听清，请输入"
+            titleLabel.text = "未听清，请输入"
         } else {
-            messageBlock.text = "我是AI助手哦\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在"
+            titleLabel.text = "有什么需要帮助的？"
         }
         
         voiceButton.isHidden = true
-        titleLabel.isHidden = true
     }
     
     private func addMessage(_ text: String, isUser: Bool) {
         if isUser {
-            messageBlock.text = text
+            titleLabel.text = text
         }
     }
     
@@ -280,5 +266,26 @@ extension UIColor {
         let b = CGFloat(rgb & 0x0000FF) / 255.0
         
         self.init(red: r, green: g, blue: b, alpha: 1.0)
+    }
+}
+
+// UILabel 扩展，支持行间距
+extension UILabel {
+    var lineSpacing: CGFloat {
+        get {
+            guard let text = self.text, let font = self.font else { return 0 }
+            let attributedString = NSAttributedString(string: text, attributes: [NSAttributedString.Key.font: font])
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineSpacing = self.lineSpacing
+            let attributedStringWithLineSpacing = NSAttributedString(string: text, attributes: [NSAttributedString.Key.font: font, NSAttributedString.Key.paragraphStyle: paragraphStyle])
+            return paragraphStyle.lineSpacing
+        }
+        set {
+            guard let text = self.text, let font = self.font else { return }
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineSpacing = newValue
+            let attributedString = NSAttributedString(string: text, attributes: [NSAttributedString.Key.font: font, NSAttributedString.Key.paragraphStyle: paragraphStyle])
+            self.attributedText = attributedString
+        }
     }
 }
