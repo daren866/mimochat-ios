@@ -394,8 +394,8 @@ class SiriViewController: UIViewController {
                             loadingContainer.removeFromSuperview()
                         }
                         
-                        if let lastMessage = self.messages.last {
-                            lastMessage.text.append(content)
+                        if self.messages.count > 0 {
+                            self.messages[self.messages.count - 1].text.append(content)
                             self.updateLastMessage(content)
                         }
                     }
