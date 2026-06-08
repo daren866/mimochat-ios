@@ -911,13 +911,4 @@ struct MessageBubble: View {
     }
 }
 
-// MARK: - App入口
 
-@main
-struct MiMoChatApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
-}
