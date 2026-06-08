@@ -574,16 +574,6 @@ struct ContentView: View {
     @State private var errorMessage: String?
     private let tokenKey = "mimoCookieToken"
     private let conversationIdKey = "mimoConversationId"
-    
-    init() {
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("OpenSiriMode"),
-            object: nil,
-            queue: .main
-        ) { _ in
-            self.showSiriMode = true
-        }
-    }
 
     var body: some View {
         Group {
@@ -629,6 +619,17 @@ struct ContentView: View {
         }
         .onAppear {
             loadToken()
+            setupSiriModeObserver()
+        }
+    }
+    
+    private func setupSiriModeObserver() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("OpenSiriMode"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showSiriMode = true
         }
     }
 
