@@ -87,6 +87,41 @@ struct SendMessageData: Codable {
     let messageId: String?
 }
 
+struct ConversationSaveResponse: Codable {
+    let code: Int
+    let msg: String
+    let data: ConversationData
+}
+
+struct ConversationData: Codable {
+    let id: Int
+    let creator: String
+    let createTime: String
+    let updater: String
+    let updateTime: String
+    let title: String
+    let conversationId: String
+    let deleteFlag: Int
+    let type: String
+}
+
+struct ModelConfig: Codable {
+    let enableThinking: Bool
+    let webSearchStatus: String
+    let model: String
+    let temperature: Double
+    let topP: Double
+}
+
+struct ChatRequestBody: Codable {
+    let msgId: String
+    let conversationId: String
+    let query: String
+    let isEditedQuery: Bool
+    let modelConfig: ModelConfig
+    let multiMedias: [String]
+}
+
 // MARK: - 网络管理器
 
 class NetworkManager {
@@ -149,19 +184,14 @@ class NetworkManager {
         }.resume()
     }
 
-    // MARK: - 发送消息
-    func sendMessage(token: String, message: String, conversationId: String?,
-                     completion: @escaping (Result<SendMessageData, Error>) -> Void) {
-
-        var request = baseRequest(path: "chat/conversation/send", token: token)
-
-        var body: [String: Any] = [
-            "content": message,
-            "type": "text"
+    // MARK: - 创建对话
+    func createConversation(token: String, conversationId: String, completion: @escaping (Result<String, Error>) -> Void) {
+        var request = baseRequest(path: "chat/conversation/save", token: token)
+        let body: [String: Any] = [
+            "conversationId": conversationId,
+            "title": "新对话",
+            "type": "chat"
         ]
-        if let convId = conversationId {
-            body["conversationId"] = convId
-        }
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         URLSession.shared.dataTask(with: request) { data, response, error in
@@ -176,45 +206,128 @@ class NetworkManager {
                 }
                 return
             }
-
-            let rawString = String(data: data, encoding: .utf8) ?? ""
-            print("=== API Response ===\n\(rawString)\n====================")
-
             do {
-                let resp = try JSONDecoder().decode(SendMessageResponse.self, from: data)
-                if resp.code == 0, let dataObj = resp.data {
-                    DispatchQueue.main.async { completion(.success(dataObj)) }
+                let resp = try JSONDecoder().decode(ConversationSaveResponse.self, from: data)
+                if resp.code == 0 {
+                    DispatchQueue.main.async { completion(.success(resp.data.conversationId)) }
                 } else {
-                    // 尝试备用解析：有些接口直接返回 content 字段
-                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let dataDict = json["data"] as? [String: Any],
-                       let content = dataDict["content"] as? String {
-                        let fallback = SendMessageData(content: content,
-                                                       conversationId: dataDict["conversationId"] as? String,
-                                                       messageId: dataDict["messageId"] as? String)
-                        DispatchQueue.main.async { completion(.success(fallback)) }
-                    } else {
-                        DispatchQueue.main.async {
-                            completion(.failure(NSError(domain: "API", code: resp.code,
-                                                       userInfo: [NSLocalizedDescriptionKey: resp.msg])))
-                        }
+                    DispatchQueue.main.async {
+                        completion(.failure(NSError(domain: "API", code: resp.code,
+                                                   userInfo: [NSLocalizedDescriptionKey: resp.msg])))
                     }
                 }
             } catch {
-                // 最终兜底：尝试从原始 JSON 提取内容
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let content = json["content"] as? String
-                        ?? json["reply"] as? String
-                        ?? json["message"] as? String
-                        ?? rawString
-                    let fallback = SendMessageData(content: content,
-                                                   conversationId: nil, messageId: nil)
-                    DispatchQueue.main.async { completion(.success(fallback)) }
-                } else {
-                    DispatchQueue.main.async { completion(.failure(error)) }
-                }
+                DispatchQueue.main.async { completion(.failure(error)) }
             }
         }.resume()
+    }
+
+    // MARK: - 发送消息 (SSE流式响应)
+    func sendChatMessage(token: String, message: String, conversationId: String,
+                         onMessage: @escaping (String) -> Void,
+                         onFinish: @escaping () -> Void,
+                         onError: @escaping (Error) -> Void) {
+        let urlString = "\(baseURL)/bot/chat?xiaomichatbot_ph=\(ph)"
+        guard let url = URL(string: urlString) else {
+            onError(NSError(domain: "NetworkManager", code: -1,
+                           userInfo: [NSLocalizedDescriptionKey: "无效的URL"]))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("*/*", forHTTPHeaderField: "accept")
+        request.setValue("system", forHTTPHeaderField: "accept-language")
+        request.setValue("no-cache", forHTTPHeaderField: "cache-control")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue("no-cache", forHTTPHeaderField: "pragma")
+        request.setValue("u=1, i", forHTTPHeaderField: "priority")
+        request.setValue("Etc/GMT-8", forHTTPHeaderField: "x-timezone")
+        request.setValue(token, forHTTPHeaderField: "cookie")
+        request.setValue("https://aistudio.xiaomimimo.com/", forHTTPHeaderField: "Referer")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 120
+
+        let modelConfig = ModelConfig(
+            enableThinking: false,
+            webSearchStatus: "disabled",
+            model: "mimo-v2.5",
+            temperature: 0.8,
+            topP: 0.95
+        )
+
+        let chatBody = ChatRequestBody(
+            msgId: UUID().uuidString,
+            conversationId: conversationId,
+            query: message,
+            isEditedQuery: false,
+            modelConfig: modelConfig,
+            multiMedias: []
+        )
+
+        do {
+            request.httpBody = try JSONEncoder().encode(chatBody)
+        } catch {
+            onError(error)
+            return
+        }
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { onError(error) }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    onError(NSError(domain: "NetworkManager", code: -1,
+                                   userInfo: [NSLocalizedDescriptionKey: "无数据返回"]))
+                }
+                return
+            }
+
+            if let responseString = String(data: data, encoding: .utf8) {
+                self.parseSSEStream(responseString, onMessage: onMessage, onFinish: onFinish)
+            }
+        }
+        task.resume()
+    }
+
+    private func parseSSEStream(_ response: String, onMessage: @escaping (String) -> Void, onFinish: @escaping () -> Void) {
+        let lines = response.components(separatedBy: "\n")
+        var currentEvent = ""
+        
+        for line in lines {
+            if line.hasPrefix("event:") {
+                currentEvent = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("data:") {
+                let dataContent = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                
+                if currentEvent == "message" {
+                    if let content = extractContent(from: dataContent) {
+                        DispatchQueue.main.async { onMessage(content) }
+                    }
+                } else if currentEvent == "finish" {
+                    DispatchQueue.main.async { onFinish() }
+                }
+            }
+        }
+    }
+
+    private func extractContent(from data: String) -> String? {
+        guard let jsonData = data.data(using: .utf8) else { return nil }
+        
+        do {
+            if let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let type = json["type"] as? String,
+               type == "text",
+               let content = json["content"] as? String {
+                return content
+            }
+        } catch {
+            print("Failed to parse SSE data: \(error)")
+        }
+        return nil
     }
 }
 
@@ -295,21 +408,60 @@ struct ContentView: View {
         isLoading = true
         errorMessage = nil
 
-        NetworkManager.shared.sendMessage(
-            token: mimoToken,
-            message: trimmed,
-            conversationId: currentConversationId
-        ) { result in
-            isLoading = false
-            switch result {
-            case .success(let data):
-                let reply = data.content ?? "收到空回复"
-                messages.append(Message(text: reply, isUser: false))
-                if let convId = data.conversationId {
-                    currentConversationId = convId
+        let handleSendMessage = { [weak self] (convId: String) in
+            guard let self = self else { return }
+            
+            let messageId = UUID().uuidString
+            self.messages.append(Message(text: "", isUser: false))
+            let messageIndex = self.messages.count - 1
+            
+            NetworkManager.shared.sendChatMessage(
+                token: self.mimoToken,
+                message: trimmed,
+                conversationId: convId,
+                onMessage: { content in
+                    DispatchQueue.main.async {
+                        if messageIndex < self.messages.count {
+                            self.messages[messageIndex].text += content
+                        }
+                    }
+                },
+                onFinish: {
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                    }
+                },
+                onError: { error in
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        if messageIndex < self.messages.count {
+                            self.messages[messageIndex].text = "请求失败：\(error.localizedDescription)"
+                        }
+                    }
                 }
-            case .failure(let error):
-                messages.append(Message(text: "请求失败：\(error.localizedDescription)", isUser: false))
+            )
+        }
+
+        if let convId = currentConversationId {
+            handleSendMessage(convId)
+        } else {
+            let newConversationId = UUID().uuidString.lowercased()
+            NetworkManager.shared.createConversation(
+                token: mimoToken,
+                conversationId: newConversationId
+            ) { [weak self] result in
+                guard let self = self else { return }
+                
+                switch result {
+                case .success(let convId):
+                    self.currentConversationId = convId
+                    handleSendMessage(convId)
+                case .failure(let error):
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        self.messages.append(Message(text: "创建对话失败：\(error.localizedDescription)", isUser: false))
+                    }
+                }
             }
         }
     }
@@ -578,21 +730,59 @@ struct ChatView: View {
         inputText = ""
         isLoading = true
 
-        NetworkManager.shared.sendMessage(
-            token: mimoToken,
-            message: trimmed,
-            conversationId: currentConversationId
-        ) { result in
-            isLoading = false
-            switch result {
-            case .success(let data):
-                let reply = data.content ?? "收到空回复"
-                messages.append(Message(text: reply, isUser: false))
-                if let convId = data.conversationId {
-                    currentConversationId = convId
+        let handleSendMessage = { [weak self] (convId: String) in
+            guard let self = self else { return }
+            
+            self.messages.append(Message(text: "", isUser: false))
+            let messageIndex = self.messages.count - 1
+            
+            NetworkManager.shared.sendChatMessage(
+                token: self.mimoToken,
+                message: trimmed,
+                conversationId: convId,
+                onMessage: { content in
+                    DispatchQueue.main.async {
+                        if messageIndex < self.messages.count {
+                            self.messages[messageIndex].text += content
+                        }
+                    }
+                },
+                onFinish: {
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                    }
+                },
+                onError: { error in
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        if messageIndex < self.messages.count {
+                            self.messages[messageIndex].text = "请求失败：\(error.localizedDescription)"
+                        }
+                    }
                 }
-            case .failure(let error):
-                messages.append(Message(text: "请求失败：\(error.localizedDescription)", isUser: false))
+            )
+        }
+
+        if let convId = currentConversationId {
+            handleSendMessage(convId)
+        } else {
+            let newConversationId = UUID().uuidString.lowercased()
+            NetworkManager.shared.createConversation(
+                token: mimoToken,
+                conversationId: newConversationId
+            ) { [weak self] result in
+                guard let self = self else { return }
+                
+                switch result {
+                case .success(let convId):
+                    self.currentConversationId = convId
+                    handleSendMessage(convId)
+                case .failure(let error):
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        self.messages.append(Message(text: "创建对话失败：\(error.localizedDescription)", isUser: false))
+                    }
+                }
             }
         }
     }
