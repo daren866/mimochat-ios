@@ -234,36 +234,38 @@ struct ContentView: View {
     private let tokenKey = "mimoCookieToken"
 
     var body: some View {
-        if showChat {
-            ChatView(
-                messages: $messages,
-                inputText: $inputText,
-                showSettings: $showSettings,
-                showChatHistory: $showChatHistory,
-                mimoToken: $mimoToken,
-                chatRecords: $chatRecords,
-                isLoading: $isLoading,
-                currentConversationId: $currentConversationId,
-                loadChatRecords: loadChatRecords,
-                saveToken: saveToken
-            )
-        } else {
-            WelcomeView(
-                inputText: $inputText,
-                onSend: sendMessage,
-                showSettings: $showSettings,
-                showChatHistory: $showChatHistory,
-                mimoToken: $mimoToken,
-                chatRecords: $chatRecords,
-                isLoading: $isLoading,
-                errorMessage: $errorMessage,
-                loadChatRecords: loadChatRecords,
-                saveToken: saveToken
-            )
+        Group {
+            if showChat {
+                ChatView(
+                    messages: $messages,
+                    inputText: $inputText,
+                    showSettings: $showSettings,
+                    showChatHistory: $showChatHistory,
+                    mimoToken: $mimoToken,
+                    chatRecords: $chatRecords,
+                    isLoading: $isLoading,
+                    currentConversationId: $currentConversationId,
+                    loadChatRecords: loadChatRecords,
+                    saveToken: saveToken
+                )
+            } else {
+                WelcomeView(
+                    inputText: $inputText,
+                    onSend: sendMessage,
+                    showSettings: $showSettings,
+                    showChatHistory: $showChatHistory,
+                    mimoToken: $mimoToken,
+                    chatRecords: $chatRecords,
+                    isLoading: $isLoading,
+                    errorMessage: $errorMessage,
+                    loadChatRecords: loadChatRecords,
+                    saveToken: saveToken
+                )
+            }
         }
-    }
-    .onAppear {
-        loadToken()
+        .onAppear {
+            loadToken()
+        }
     }
 
     private func saveToken(_ token: String) {
