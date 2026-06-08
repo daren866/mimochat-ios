@@ -30,6 +30,9 @@ class SiriViewController: UIViewController {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine: AVAudioEngine?
     
+    // 新增：用于保存实时识别到的文本，以便在点击停止时获取
+    private var currentTranscript: String = ""
+    
     private let tokenKey = "mimoCookieToken"
     private let conversationIdKey = "mimoConversationId"
     
@@ -60,7 +63,6 @@ class SiriViewController: UIViewController {
         
         contentView.translatesAutoresizingMaskIntoConstraints = false
         contentView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
-        // 改为只保留上方的圆角，贴合底部弹窗风格
         contentView.layer.cornerRadius = 24
         contentView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         contentView.clipsToBounds = true
@@ -141,7 +143,6 @@ class SiriViewController: UIViewController {
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 修改：将 contentView 固定在屏幕底部
             contentView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             contentView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             contentView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -164,7 +165,6 @@ class SiriViewController: UIViewController {
             speakButton.heightAnchor.constraint(equalToConstant: 60),
             speakButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
             
-            // 默认界面的键盘切换按钮，位于左下角
             keyboardButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             keyboardButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -50),
             keyboardButton.widthAnchor.constraint(equalToConstant: 36),
@@ -191,7 +191,6 @@ class SiriViewController: UIViewController {
             inputContainerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
             inputContainerView.heightAnchor.constraint(equalToConstant: 50),
             
-            // 聊天界面的键盘切换按钮布局
             keyboardButton.centerYAnchor.constraint(equalTo: inputContainerView.centerYAnchor),
             keyboardButton.leadingAnchor.constraint(equalTo: inputContainerView.leadingAnchor),
             keyboardButton.widthAnchor.constraint(equalToConstant: 44),
@@ -247,6 +246,7 @@ class SiriViewController: UIViewController {
         }
         
         stopListening()
+        currentTranscript = "" // 每次开始听写前清空上次的记录
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else { return }
         recognitionRequest.shouldReportPartialResults = true
@@ -271,14 +271,14 @@ class SiriViewController: UIViewController {
             guard let self = self else { return }
             
             if let result = result {
-                let transcript = result.bestTranscription.formattedString
-                // 如果识别已经彻底完成（用户停顿较久系统自动结束），自动处理识别结果
+                // 持续更新最新识别的文本
+                self.currentTranscript = result.bestTranscription.formattedString
+                
                 if result.isFinal {
-                    self.handleRecognitionResult(transcript)
+                    self.handleRecognitionResult(self.currentTranscript)
                 }
             }
             
-            // 如果发生错误或者识别彻底结束，则停止听写引擎
             if error != nil || (result?.isFinal ?? false) {
                 self.stopListening()
             }
@@ -519,11 +519,8 @@ class SiriViewController: UIViewController {
     
     @objc private func toggleListening() {
         if isListening {
-            // 修改：点击停止时，立即获取当前已识别的内容并处理
-            if let task = recognitionTask, let result = task.result {
-                let transcript = result.bestTranscription.formattedString
-                handleRecognitionResult(transcript)
-            }
+            // 修改：点击停止时，直接使用缓存的实时识别文本处理
+            handleRecognitionResult(currentTranscript)
             stopListening()
         } else {
             startListening()
