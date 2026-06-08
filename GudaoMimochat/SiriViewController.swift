@@ -7,7 +7,8 @@ class SiriViewController: UIViewController {
     private let container = UIView()
     private let titleLabel = UILabel()
     private let userTextLabel = UILabel()
-    private let aiTextBlock = UILabel()
+    // 替换为 UITextView 以支持多行滚动
+    private let aiTextView = UITextView()
     private let voiceButton = UIButton(type: .system)
     
     private var isListening = false
@@ -20,7 +21,6 @@ class SiriViewController: UIViewController {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine: AVAudioEngine?
     
-    // 用于保存实时识别到的文本
     private var currentTranscript: String = ""
     
     private let tokenKey = "mimoCookieToken"
@@ -29,17 +29,6 @@ class SiriViewController: UIViewController {
     private var mimoToken: String {
         UserDefaults.standard.string(forKey: tokenKey) ?? ""
     }
-    
-    // 约束引用
-    private var containerLeadingInitial: NSLayoutConstraint!
-    private var containerTrailingInitial: NSLayoutConstraint!
-    private var containerBottomInitial: NSLayoutConstraint!
-    private var containerHeightInitial: NSLayoutConstraint!
-    
-    private var containerLeadingResponse: NSLayoutConstraint!
-    private var containerTrailingResponse: NSLayoutConstraint!
-    private var containerCenterYResponse: NSLayoutConstraint!
-    private var containerHeightResponse: NSLayoutConstraint!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -74,6 +63,7 @@ class SiriViewController: UIViewController {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
         backgroundView.addGestureRecognizer(tapGesture)
         
+        // 容器始终固定在底部，高度占屏幕 0.55
         container.translatesAutoresizingMaskIntoConstraints = false
         container.backgroundColor = UIColor(hex: "#e0e0e0")
         container.layer.cornerRadius = 30
@@ -98,14 +88,18 @@ class SiriViewController: UIViewController {
         userTextLabel.numberOfLines = 0
         container.addSubview(userTextLabel)
         
-        aiTextBlock.translatesAutoresizingMaskIntoConstraints = false
-        aiTextBlock.font = UIFont.systemFont(ofSize: 24)
-        aiTextBlock.textColor = .black
-        aiTextBlock.textAlignment = .left
-        aiTextBlock.numberOfLines = 0
-        aiTextBlock.lineBreakMode = .byWordWrapping
-        aiTextBlock.lineSpacing = 1.5
-        container.addSubview(aiTextBlock)
+        // 使用 UITextView 替换 UILabel，支持滚动
+        aiTextView.translatesAutoresizingMaskIntoConstraints = false
+        aiTextView.font = UIFont.systemFont(ofSize: 24)
+        aiTextView.textColor = .black
+        aiTextView.textAlignment = .left
+        aiTextView.isEditable = false
+        aiTextView.isSelectable = true
+        aiTextView.isScrollEnabled = true
+        aiTextView.backgroundColor = .clear
+        aiTextView.textContainerInset = .zero
+        aiTextView.textContainer.lineFragmentPadding = 0
+        container.addSubview(aiTextView)
         
         voiceButton.translatesAutoresizingMaskIntoConstraints = false
         voiceButton.setTitle("点击输入语音", for: .normal)
@@ -118,26 +112,17 @@ class SiriViewController: UIViewController {
         voiceButton.addTarget(self, action: #selector(handleTapAction), for: .touchUpInside)
         container.addSubview(voiceButton)
         
-        containerLeadingInitial = container.leadingAnchor.constraint(equalTo: view.leadingAnchor)
-        containerTrailingInitial = container.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        containerBottomInitial = container.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        containerHeightInitial = container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.55)
-        
-        containerLeadingResponse = container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: view.bounds.width * 0.05)
-        containerTrailingResponse = container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -view.bounds.width * 0.05)
-        containerCenterYResponse = container.centerYAnchor.constraint(equalTo: view.centerYAnchor)
-        containerHeightResponse = container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.45)
-        
         NSLayoutConstraint.activate([
             backgroundView.topAnchor.constraint(equalTo: view.topAnchor),
             backgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            containerLeadingInitial,
-            containerTrailingInitial,
-            containerBottomInitial,
-            containerHeightInitial,
+            // 固定在底部，不随状态改变位置和大小
+            container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            container.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.55),
             
             titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
             titleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
@@ -146,13 +131,13 @@ class SiriViewController: UIViewController {
             
             userTextLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
             userTextLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
-            userTextLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 20),
-            userTextLabel.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.08),
+            userTextLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 30),
             
-            aiTextBlock.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
-            aiTextBlock.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
-            aiTextBlock.topAnchor.constraint(equalTo: container.topAnchor, constant: 60),
-            aiTextBlock.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.65),
+            // AI回复区域：从用户文本下方开始，一直延伸到按钮上方
+            aiTextView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
+            aiTextView.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
+            aiTextView.topAnchor.constraint(equalTo: userTextLabel.bottomAnchor, constant: 15),
+            aiTextView.bottomAnchor.constraint(equalTo: voiceButton.topAnchor, constant: -20),
             
             voiceButton.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
             voiceButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
@@ -161,7 +146,7 @@ class SiriViewController: UIViewController {
         ])
         
         userTextLabel.isHidden = true
-        aiTextBlock.isHidden = true
+        aiTextView.isHidden = true
     }
     
     private func setupSpeechRecognizer() {
@@ -296,43 +281,32 @@ class SiriViewController: UIViewController {
     }
     
     private func transitionToResponseState(userText: String) {
-        titleLabel.text = ""
+        // 隐藏初始界面的问候语
+        titleLabel.isHidden = true
         
+        // 显示对话内容
         userTextLabel.text = userText
-        aiTextBlock.text = ""
-        
+        aiTextView.text = ""
         userTextLabel.isHidden = false
-        aiTextBlock.isHidden = false
+        aiTextView.isHidden = false
         
-        NSLayoutConstraint.deactivate([
-            containerLeadingInitial,
-            containerTrailingInitial,
-            containerBottomInitial,
-            containerHeightInitial
-        ])
-        
-        NSLayoutConstraint.activate([
-            containerLeadingResponse,
-            containerTrailingResponse,
-            containerCenterYResponse,
-            containerHeightResponse
-        ])
-        
-        UIView.animate(withDuration: 0.3) {
-            self.view.layoutIfNeeded()
-        }
+        // 容器位置固定不动，不需要改变约束
     }
     
-    // 修改为追加模式，适配流式输出
     private func appendMessage(_ text: String, isUser: Bool) {
         if isUser {
             userTextLabel.text = text
         } else {
-            aiTextBlock.text = (aiTextBlock.text ?? "") + text
+            let currentText = aiTextView.text ?? ""
+            aiTextView.text = currentText + text
+            
+            // 自动滚动到最底部
+            let range = NSMakeRange(aiTextView.text.count - 1, 1)
+            aiTextView.scrollRangeToVisible(range)
         }
     }
     
-    // MARK: - 真实网络请求（使用 NetworkManager）
+    // MARK: - 网络请求
     private func sendToMimo(_ text: String) {
         guard !mimoToken.isEmpty else {
             appendMessage("请先在设置中配置 Token", isUser: false)
@@ -350,7 +324,9 @@ class SiriViewController: UIViewController {
                 message: text,
                 conversationId: convId,
                 onMessage: { content in
-                    self.appendMessage(content, isUser: false)
+                    DispatchQueue.main.async {
+                        self.appendMessage(content, isUser: false)
+                    }
                 },
                 onFinish: {
                     DispatchQueue.main.async {
