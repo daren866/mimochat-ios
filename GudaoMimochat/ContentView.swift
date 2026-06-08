@@ -614,7 +614,7 @@ struct ContentView: View {
                 onMessage: { content in
                     DispatchQueue.main.async {
                         if messageIndex < self.messages.count {
-                            typeText(content, at: messageIndex)
+                            typeText(content, messageIndex)
                         }
                     }
                 },
@@ -941,7 +941,7 @@ struct ChatView: View {
                 onMessage: { content in
                     DispatchQueue.main.async {
                         if messageIndex < self.messages.count {
-                            typeText(content, at: messageIndex)
+                            typeText(content, messageIndex)
                         }
                     }
                 },
