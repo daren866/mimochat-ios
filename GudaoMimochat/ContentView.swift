@@ -413,9 +413,7 @@ struct ContentView: View {
         messages.append(Message(text: "", isUser: false))
         let messageIndex = messages.count - 1
         
-        let sendChat = { [weak self] (convId: String) in
-            guard let self = self else { return }
-            
+        let sendChat = { (convId: String) in
             NetworkManager.shared.sendChatMessage(
                 token: token,
                 message: trimmed,
@@ -450,9 +448,7 @@ struct ContentView: View {
             NetworkManager.shared.createConversation(
                 token: token,
                 conversationId: newConversationId
-            ) { [weak self] result in
-                guard let self = self else { return }
-                
+            ) { result in
                 switch result {
                 case .success(let convId):
                     DispatchQueue.main.async {
@@ -738,9 +734,7 @@ struct ChatView: View {
         messages.append(Message(text: "", isUser: false))
         let messageIndex = messages.count - 1
         
-        let sendChat = { [weak self] (convId: String) in
-            guard let self = self else { return }
-            
+        let sendChat = { (convId: String) in
             NetworkManager.shared.sendChatMessage(
                 token: token,
                 message: trimmed,
@@ -775,9 +769,7 @@ struct ChatView: View {
             NetworkManager.shared.createConversation(
                 token: token,
                 conversationId: newConversationId
-            ) { [weak self] result in
-                guard let self = self else { return }
-                
+            ) { result in
                 switch result {
                 case .success(let convId):
                     DispatchQueue.main.async {
