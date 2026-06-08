@@ -10,11 +10,10 @@ class SiriViewController: UIViewController {
     private let aiTextBlock = UILabel()
     private let voiceButton = UIButton(type: .system)
     
-    private var messages: [Message] = []
     private var isListening = false
     private var isLoading = false
-    private var currentConversationId: String?
     private var isFirstInteraction = true
+    private var currentConversationId: String?
     
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -44,6 +43,7 @@ class SiriViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        loadConversationId()
         setupUI()
         setupSpeechRecognizer()
         requestPermissions()
@@ -54,18 +54,26 @@ class SiriViewController: UIViewController {
         stopListening()
     }
     
+    private func loadConversationId() {
+        if let savedId = UserDefaults.standard.string(forKey: conversationIdKey) {
+            currentConversationId = savedId
+        }
+    }
+    
+    private func saveConversationId(_ id: String) {
+        currentConversationId = id
+        UserDefaults.standard.set(id, forKey: conversationIdKey)
+    }
+    
     private func setupUI() {
-        // 设置背景颜色为 #888888
         view.backgroundColor = UIColor(hex: "#888888")
         
-        // 背景视图（用于点击关闭）
         backgroundView.translatesAutoresizingMaskIntoConstraints = false
         backgroundView.backgroundColor = UIColor(hex: "#888888")
         view.addSubview(backgroundView)
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
         backgroundView.addGestureRecognizer(tapGesture)
         
-        // 容器 - 底部弹出的圆角矩形
         container.translatesAutoresizingMaskIntoConstraints = false
         container.backgroundColor = UIColor(hex: "#e0e0e0")
         container.layer.cornerRadius = 30
@@ -73,7 +81,6 @@ class SiriViewController: UIViewController {
         container.clipsToBounds = true
         view.addSubview(container)
         
-        // 标题标签 - "有什么需要帮助的？"
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.text = "有什么需要帮助的？"
         titleLabel.font = UIFont.boldSystemFont(ofSize: 48)
@@ -84,7 +91,6 @@ class SiriViewController: UIViewController {
         titleLabel.lineSpacing = 1.2
         container.addSubview(titleLabel)
         
-        // 用户回复文本标签
         userTextLabel.translatesAutoresizingMaskIntoConstraints = false
         userTextLabel.font = UIFont.systemFont(ofSize: 16)
         userTextLabel.textColor = .black
@@ -92,7 +98,6 @@ class SiriViewController: UIViewController {
         userTextLabel.numberOfLines = 0
         container.addSubview(userTextLabel)
         
-        // AI回复文本块
         aiTextBlock.translatesAutoresizingMaskIntoConstraints = false
         aiTextBlock.font = UIFont.systemFont(ofSize: 24)
         aiTextBlock.textColor = .black
@@ -102,7 +107,6 @@ class SiriViewController: UIViewController {
         aiTextBlock.lineSpacing = 1.5
         container.addSubview(aiTextBlock)
         
-        // 长按输入语音按钮
         voiceButton.translatesAutoresizingMaskIntoConstraints = false
         voiceButton.setTitle("点击输入语音", for: .normal)
         voiceButton.titleLabel?.font = UIFont.systemFont(ofSize: 32)
@@ -114,13 +118,11 @@ class SiriViewController: UIViewController {
         voiceButton.addTarget(self, action: #selector(handleTapAction), for: .touchUpInside)
         container.addSubview(voiceButton)
         
-        // 初始状态约束
         containerLeadingInitial = container.leadingAnchor.constraint(equalTo: view.leadingAnchor)
         containerTrailingInitial = container.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         containerBottomInitial = container.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         containerHeightInitial = container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.55)
         
-        // 回复状态约束
         containerLeadingResponse = container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: view.bounds.width * 0.05)
         containerTrailingResponse = container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -view.bounds.width * 0.05)
         containerCenterYResponse = container.centerYAnchor.constraint(equalTo: view.centerYAnchor)
@@ -158,7 +160,6 @@ class SiriViewController: UIViewController {
             voiceButton.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.12)
         ])
         
-        // 初始状态下隐藏用户输入和AI回复
         userTextLabel.isHidden = true
         aiTextBlock.isHidden = true
     }
@@ -279,14 +280,18 @@ class SiriViewController: UIViewController {
         let trimmedText = text.trimmingCharacters(in: .whitespaces)
         
         if trimmedText.isEmpty {
-            if isFirstInteraction {
-                voiceButton.setTitle("点击输入语音", for: .normal)
-            } else {
-                voiceButton.setTitle("长按输入语音", for: .normal)
-            }
+            updateVoiceButtonTitle()
         } else {
             transitionToResponseState(userText: trimmedText)
             sendToMimo(trimmedText)
+        }
+    }
+    
+    private func updateVoiceButtonTitle() {
+        if isLoading {
+            voiceButton.setTitle("AI回复中...", for: .normal)
+        } else {
+            voiceButton.setTitle(isFirstInteraction ? "点击输入语音" : "长按输入语音", for: .normal)
         }
     }
     
@@ -294,7 +299,7 @@ class SiriViewController: UIViewController {
         titleLabel.text = ""
         
         userTextLabel.text = userText
-        aiTextBlock.text = "AI正在处理..."
+        aiTextBlock.text = ""
         
         userTextLabel.isHidden = false
         aiTextBlock.isHidden = false
@@ -318,92 +323,74 @@ class SiriViewController: UIViewController {
         }
     }
     
-    private func addMessage(_ text: String, isUser: Bool) {
+    // 修改为追加模式，适配流式输出
+    private func appendMessage(_ text: String, isUser: Bool) {
         if isUser {
             userTextLabel.text = text
         } else {
-            aiTextBlock.text = text
+            aiTextBlock.text = (aiTextBlock.text ?? "") + text
         }
     }
     
-    // MARK: - 真实网络请求
+    // MARK: - 真实网络请求（使用 NetworkManager）
     private func sendToMimo(_ text: String) {
         guard !mimoToken.isEmpty else {
-            addMessage("请先在设置中配置 Token", isUser: false)
+            appendMessage("请先在设置中配置 Token", isUser: false)
             return
         }
         
         isLoading = true
+        updateVoiceButtonTitle()
         
-        // 替换为您真实的 Mimo API 地址
-        guard let url = URL(string: "https://api.mimu.chat/v1/chat/completions") else {
-            addMessage("API 地址配置错误", isUser: false)
-            isLoading = false
-            return
-        }
+        let token = mimoToken
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(mimoToken)", forHTTPHeaderField: "Authorization")
-        
-        // 构建请求参数，根据 Mimo 实际要求调整
-        let body: [String: Any] = [
-            "model": "mimo", // 视实际情况修改
-            "messages": [["role": "user", "content": text]],
-            "stream": false
-        ]
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        } catch {
-            addMessage("请求构建失败", isUser: false)
-            isLoading = false
-            return
-        }
-        
-        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.isLoading = false
-                
-                if let error = error {
-                    self.addMessage("网络错误: \(error.localizedDescription)", isUser: false)
-                    return
-                }
-                
-                guard let data = data else {
-                    self.addMessage("未收到数据", isUser: false)
-                    return
-                }
-                
-                // 解析返回的 JSON 数据，提取 AI 的回复
-                do {
-                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let choices = json["choices"] as? [[String: Any]],
-                       let firstChoice = choices.first,
-                       let message = firstChoice["message"] as? [String: Any],
-                       let content = message["content"] as? String {
-                        
-                        // 更新到 UI 上
-                        self.addMessage(content, isUser: false)
-                        
-                        // 如果 API 返回了 conversationId，可以将其保存下来以便下次传入
-                        if let convId = json["id"] as? String {
-                            self.currentConversationId = convId
-                            UserDefaults.standard.set(convId, forKey: self.conversationIdKey)
-                        }
-                        
-                    } else {
-                        self.addMessage("解析响应失败", isUser: false)
+        let sendChat = { (convId: String) in
+            NetworkManager.shared.sendChatMessage(
+                token: token,
+                message: text,
+                conversationId: convId,
+                onMessage: { content in
+                    self.appendMessage(content, isUser: false)
+                },
+                onFinish: {
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        self.updateVoiceButtonTitle()
                     }
-                } catch {
-                    self.addMessage("JSON 解析错误", isUser: false)
+                },
+                onError: { error in
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        self.appendMessage("\n网络错误: \(error.localizedDescription)", isUser: false)
+                        self.updateVoiceButtonTitle()
+                    }
+                }
+            )
+        }
+        
+        if let convId = currentConversationId {
+            sendChat(convId)
+        } else {
+            let newConversationId = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+            NetworkManager.shared.createConversation(
+                token: token,
+                conversationId: newConversationId
+            ) { result in
+                switch result {
+                case .success(let convId):
+                    DispatchQueue.main.async {
+                        self.saveConversationId(convId)
+                        sendChat(convId)
+                    }
+                case .failure(let error):
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        self.appendMessage("\n创建对话失败：\(error.localizedDescription)", isUser: false)
+                        self.updateVoiceButtonTitle()
+                    }
                 }
             }
         }
-        
-        task.resume()
     }
     
     @objc private func handleBackgroundTap() {
