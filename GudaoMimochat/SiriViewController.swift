@@ -353,7 +353,6 @@ class SiriViewController: UIViewController {
         
         isLoading = true
         
-        let messageIndex = messages.count
         messages.append(Message(text: "", isUser: false))
         
         let loadingLabel = UILabel()
