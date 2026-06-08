@@ -6,6 +6,8 @@ class SiriViewController: UIViewController {
     private let backgroundView = UIView()
     private let container = UIView()
     private let titleLabel = UILabel()
+    private let userTextLabel = UILabel()
+    private let aiTextBlock = UILabel()
     private let voiceButton = UIButton(type: .system)
     
     private var messages: [Message] = []
@@ -70,6 +72,24 @@ class SiriViewController: UIViewController {
         titleLabel.lineSpacing = 1.2
         container.addSubview(titleLabel)
         
+        // 用户回复文本标签
+        userTextLabel.translatesAutoresizingMaskIntoConstraints = false
+        userTextLabel.font = UIFont.systemFont(ofSize: 16)
+        userTextLabel.textColor = .black
+        userTextLabel.textAlignment = .left
+        userTextLabel.numberOfLines = 0
+        container.addSubview(userTextLabel)
+        
+        // AI回复文本块
+        aiTextBlock.translatesAutoresizingMaskIntoConstraints = false
+        aiTextBlock.font = UIFont.systemFont(ofSize: 24)
+        aiTextBlock.textColor = .black
+        aiTextBlock.textAlignment = .left
+        aiTextBlock.numberOfLines = 0
+        aiTextBlock.lineBreakMode = .byWordWrapping
+        aiTextBlock.lineSpacing = 1.5
+        container.addSubview(aiTextBlock)
+        
         // 长按输入语音按钮
         voiceButton.translatesAutoresizingMaskIntoConstraints = false
         voiceButton.setTitle("长按输入语音", for: .normal)
@@ -92,17 +112,29 @@ class SiriViewController: UIViewController {
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 容器位置：x: 0, y: 0.45, width: 1.0, height: 0.55
-            container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            container.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            container.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.55),
+            // 容器位置：x: 0.05, y: 0.5, width: 0.9, height: 0.45
+            container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: view.bounds.width * 0.05),
+            container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -view.bounds.width * 0.05),
+            container.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.45),
             
             // 标题标签位置：x: 0.05, y: 0.35, width: 0.9, height: 0.2
             titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: container.bounds.width * 0.05),
             titleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -container.bounds.width * 0.05),
             titleLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -container.bounds.height * 0.15),
             titleLabel.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.2),
+            
+            // 用户回复文本标签位置：x: 0.05, y: 0.05, width: 0.9, height: 0.08
+            userTextLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: container.bounds.width * 0.05),
+            userTextLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -container.bounds.width * 0.05),
+            userTextLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: container.bounds.height * 0.05),
+            userTextLabel.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.08),
+            
+            // AI回复文本块位置：x: 0.05, y: 0.15, width: 0.9, height: 0.65
+            aiTextBlock.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: container.bounds.width * 0.05),
+            aiTextBlock.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -container.bounds.width * 0.05),
+            aiTextBlock.topAnchor.constraint(equalTo: container.topAnchor, constant: container.bounds.height * 0.15),
+            aiTextBlock.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.65),
             
             // 按钮位置：x: 0.05, y: 0.85, width: 0.9, height: 0.12
             voiceButton.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: container.bounds.width * 0.05),
@@ -202,25 +234,31 @@ class SiriViewController: UIViewController {
         if trimmedText.isEmpty {
             showChatInterface(isEmptyResult: true)
         } else {
-            showChatInterface(isEmptyResult: false)
-            addMessage(trimmedText, isUser: true)
-            sendToMimo(trimmedText)
+            showChatInterface(isEmptyResult: false, userText: trimmedText, aiText: "你好，我可以：\n看电视\n搜索新闻\n运行代码\n哦~")
         }
     }
     
-    private func showChatInterface(isEmptyResult: Bool = false) {
+    private func showChatInterface(isEmptyResult: Bool = false, userText: String = "", aiText: String = "") {
         if isEmptyResult {
             titleLabel.text = "未听清，请输入"
+            userTextLabel.text = ""
+            aiTextBlock.text = ""
         } else {
             titleLabel.text = "有什么需要帮助的？"
+            userTextLabel.text = userText
+            aiTextBlock.text = aiText
         }
         
-        voiceButton.isHidden = true
+        voiceButton.isHidden = false
+        userTextLabel.isHidden = isEmptyResult
+        aiTextBlock.isHidden = isEmptyResult
     }
     
     private func addMessage(_ text: String, isUser: Bool) {
         if isUser {
-            titleLabel.text = text
+            userTextLabel.text = text
+        } else {
+            aiTextBlock.text = text
         }
     }
     
@@ -234,7 +272,7 @@ class SiriViewController: UIViewController {
         addMessage("AI正在处理...", isUser: false)
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.addMessage("这是AI的回复内容", isUser: false)
+            self.addMessage("你好，我可以：\n看电视\n搜索新闻\n运行代码\n哦~", isUser: false)
             self.isLoading = false
         }
     }
