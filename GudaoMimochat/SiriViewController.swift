@@ -14,6 +14,7 @@ class SiriViewController: UIViewController {
     private var isListening = false
     private var isLoading = false
     private var currentConversationId: String?
+    private var currentState: String = "initial_state"
     
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -112,11 +113,11 @@ class SiriViewController: UIViewController {
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 容器位置：x: 0.05, y: 0.5, width: 0.9, height: 0.45
-            container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: view.bounds.width * 0.05),
-            container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -view.bounds.width * 0.05),
-            container.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.45),
+            // 初始状态容器位置：x: 0, y: 0.45, width: 1.0, height: 0.55
+            container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            container.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.55),
             
             // 标题标签位置：x: 0.05, y: 0.35, width: 0.9, height: 0.2
             titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: container.bounds.width * 0.05),
@@ -142,6 +143,10 @@ class SiriViewController: UIViewController {
             voiceButton.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -container.bounds.height * 0.08),
             voiceButton.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.12)
         ])
+        
+        // 初始状态下隐藏用户输入和AI回复
+        userTextLabel.isHidden = true
+        aiTextBlock.isHidden = true
     }
     
     private func setupSpeechRecognizer() {
@@ -234,21 +239,44 @@ class SiriViewController: UIViewController {
         if trimmedText.isEmpty {
             showChatInterface(isEmptyResult: true)
         } else {
-            // 自动发送内容，不需要用户确认
-            showChatInterface(isEmptyResult: false, userText: trimmedText, aiText: "AI正在处理...")
+            // 语音输入完成后，切换到回复状态
+            transitionToResponseState(userText: trimmedText)
             sendToMimo(trimmedText)
         }
     }
     
-    private func showChatInterface(isEmptyResult: Bool = false, userText: String = "", aiText: String = "") {
+    private func transitionToResponseState(userText: String) {
+        // 删除"有什么需要帮助的？"文字
+        titleLabel.text = ""
+        
+        // 显示用户输入和AI回复
+        userTextLabel.text = "用户输入，不支持多行"
+        aiTextBlock.text = "这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在"
+        
+        // 显示用户输入和AI回复
+        userTextLabel.isHidden = false
+        aiTextBlock.isHidden = false
+        
+        // 更新容器位置到回复状态
+        NSLayoutConstraint.activate([
+            container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: view.bounds.width * 0.05),
+            container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -view.bounds.width * 0.05),
+            container.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            container.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.45),
+        ])
+        
+        currentState = "response_state"
+    }
+    
+    private func showChatInterface(isEmptyResult: Bool = false) {
         if isEmptyResult {
             titleLabel.text = "未听清，请输入"
             userTextLabel.text = ""
             aiTextBlock.text = ""
         } else {
             titleLabel.text = "有什么需要帮助的？"
-            userTextLabel.text = userText
-            aiTextBlock.text = aiText
+            userTextLabel.text = ""
+            aiTextBlock.text = ""
         }
         
         voiceButton.isHidden = false
@@ -274,7 +302,7 @@ class SiriViewController: UIViewController {
         addMessage("AI正在处理...", isUser: false)
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.addMessage("你好，我可以：\n看电视\n搜索新闻\n运行代码\n哦~", isUser: false)
+            self.addMessage("这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在", isUser: false)
             self.isLoading = false
         }
     }
