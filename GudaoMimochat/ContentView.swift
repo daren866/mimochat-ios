@@ -149,6 +149,12 @@ struct ChatRequestBody: Codable {
     let multiMedias: [String]
 }
 
+struct ApiResponse: Codable {
+    let code: Int
+    let msg: String
+    let data: String?
+}
+
 // MARK: - 网络管理器
 
 class NetworkManager {
@@ -340,6 +346,39 @@ class NetworkManager {
         let session = URLSession(configuration: configuration, delegate: SSESessionDelegate(onMessage: onMessage, onFinish: onFinish, onError: onError), delegateQueue: nil)
         let task = session.dataTask(with: request)
         task.resume()
+    }
+    
+    // MARK: - 删除聊天记录
+    func deleteConversations(token: String, conversationIds: [String], completion: @escaping (Result<Void, Error>) -> Void) {
+        var request = baseRequest(path: "chat/conversation/delete", token: token)
+        request.httpBody = try? JSONSerialization.data(withJSONObject: conversationIds)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "NetworkManager", code: -1,
+                                               userInfo: [NSLocalizedDescriptionKey: "无数据返回"])))
+                }
+                return
+            }
+            do {
+                let resp = try JSONDecoder().decode(ApiResponse.self, from: data)
+                if resp.code == 0 {
+                    DispatchQueue.main.async { completion(.success(())) }
+                } else {
+                    DispatchQueue.main.async {
+                        completion(.failure(NSError(domain: "API", code: resp.code,
+                                                   userInfo: [NSLocalizedDescriptionKey: resp.msg])))
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }.resume()
     }
 
     private func extractContent(from data: String) -> String? {
@@ -672,6 +711,33 @@ struct ContentView: View {
             }
         }
     }
+    
+    private func deleteAllChatRecords() {
+        guard !mimoToken.isEmpty else { return }
+        
+        let conversationIds = chatRecords.map { $0.conversationId }
+        guard !conversationIds.isEmpty else {
+            chatRecords.removeAll()
+            currentConversationId = nil
+            UserDefaults.standard.removeObject(forKey: conversationIdKey)
+            return
+        }
+        
+        isLoading = true
+        NetworkManager.shared.deleteConversations(token: mimoToken, conversationIds: conversationIds) { result in
+            isLoading = false
+            switch result {
+            case .success:
+                DispatchQueue.main.async {
+                    self.chatRecords.removeAll()
+                    self.currentConversationId = nil
+                    UserDefaults.standard.removeObject(forKey: self.conversationIdKey)
+                }
+            case .failure(let error):
+                print("删除聊天记录失败: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - WelcomeView
@@ -770,7 +836,8 @@ struct WelcomeView: View {
                 SettingsView(
                     showSettings: $showSettings,
                     mimoToken: mimoToken,
-                    saveToken: saveToken
+                    saveToken: saveToken,
+                    deleteAllChatRecords: deleteAllChatRecords
                 )
             }
 
@@ -900,7 +967,8 @@ struct ChatView: View {
                 SettingsView(
                     showSettings: $showSettings,
                     mimoToken: mimoToken,
-                    saveToken: saveToken
+                    saveToken: saveToken,
+                    deleteAllChatRecords: deleteAllChatRecords
                 )
             }
 
@@ -1022,7 +1090,9 @@ struct SettingsView: View {
     @Binding var showSettings: Bool
     let mimoToken: String
     let saveToken: (String) -> Void
+    let deleteAllChatRecords: () -> Void
     @State private var showTokenView = false
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         ZStack {
@@ -1051,7 +1121,7 @@ struct SettingsView: View {
 
                 VStack(spacing: 20) {
                     Button(action: {
-                        // 清除聊天记录（占位）
+                        showDeleteConfirm = true
                     }) {
                         Text("清除之前的聊天记录")
                             .font(.title)
@@ -1092,6 +1162,69 @@ struct SettingsView: View {
                     saveToken: saveToken
                 )
             }
+            
+            if showDeleteConfirm {
+                DeleteConfirmView(
+                    showDeleteConfirm: $showDeleteConfirm,
+                    onConfirm: {
+                        deleteAllChatRecords()
+                        showSettings = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+// MARK: - DeleteConfirmView
+
+struct DeleteConfirmView: View {
+    @Binding var showDeleteConfirm: Bool
+    let onConfirm: () -> Void
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.3)
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture { showDeleteConfirm = false }
+            
+            VStack(spacing: 20) {
+                Text("是否删除所有聊天记录?")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.black)
+                    .multilineTextAlignment(.center)
+                
+                HStack(spacing: 20) {
+                    Button(action: {
+                        showDeleteConfirm = false
+                    }) {
+                        Text("取消")
+                            .font(.title3)
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 30)
+                            .padding(.vertical, 12)
+                            .background(Color.gray.opacity(0.3))
+                            .cornerRadius(8)
+                    }
+                    
+                    Button(action: {
+                        onConfirm()
+                    }) {
+                        Text("确定")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 30)
+                            .padding(.vertical, 12)
+                            .background(Color.red)
+                            .cornerRadius(8)
+                    }
+                }
+            }
+            .padding(30)
+            .background(Color.white)
+            .cornerRadius(16)
+            .padding(.horizontal, 40)
         }
     }
 }
