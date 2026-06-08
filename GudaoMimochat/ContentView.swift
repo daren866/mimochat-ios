@@ -8,8 +8,10 @@ class AppState: ObservableObject {
             forName: NSNotification.Name("OpenSiriMode"),
             object: nil,
             queue: .main
-        ) { [weak self] _ in
-            self?.presentSiriViewController()
+        ) { [self] notification in
+            // 修复：self 不是可选类型，直接赋值即可
+            self.showSiriMode = true
+            self.presentSiriViewController()
         }
     }
     
@@ -30,8 +32,6 @@ class AppState: ObservableObject {
         let siriVC = SiriViewController()
         siriVC.modalPresentationStyle = .fullScreen // 设置为全屏模式
         topController.present(siriVC, animated: true)
-        
-        self?.showSiriMode = true
     }
 }
 
@@ -1515,7 +1515,7 @@ struct TokenUsageDetailView: View {
                             .padding(.horizontal, 20)
                         
                         TokenInfoRow(title: "缓存 Tokens", value: "\(usage.nativeUsage.prompt_tokens_details.cached_tokens)")
-                        TokenInfoRow(title: "推理 Tokens", value: "\(usage.nativeUsage.completion_tokens_details.reasoning_tokens)")
+                        TokenInfoRow(title: "推理 Tokens", value: "\(usage.nativeUsage.completion_tokens_details.reasoning_tokens}")
                     }
                     .padding(.horizontal, 20)
                 }
@@ -1550,4 +1550,3 @@ struct TokenInfoRow: View {
         .padding(.vertical, 8)
     }
 }
-
