@@ -75,7 +75,6 @@ class SiriViewController: UIViewController {
         messageBlock.textAlignment = .left
         messageBlock.numberOfLines = 0
         messageBlock.lineBreakMode = .byWordWrapping
-        messageBlock.lineSpacing = 1.5
         bubbleContainer.addSubview(messageBlock)
         
         // 长按输入语音按钮
@@ -132,7 +131,7 @@ class SiriViewController: UIViewController {
     }
     
     private func requestPermissions() {
-        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+        SFSpeechRecognizer.requestAuthorization { status in
             DispatchQueue.main.async {
                 switch status {
                 case .authorized: print("语音识别权限已授权")
@@ -144,11 +143,11 @@ class SiriViewController: UIViewController {
             }
         }
         
-        AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
             DispatchQueue.main.async {
                 if granted {
                     print("麦克风权限已授权")
-                    self?.startListening()
+                    self.startListening()
                 } else {
                     print("麦克风权限被拒绝")
                 }
@@ -185,18 +184,16 @@ class SiriViewController: UIViewController {
             print("启动音频引擎失败: \(error)")
         }
         
-        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            guard let self = self else { return }
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { result, error in
+            guard let result = result else { return }
             
-            if let result = result {
-                self.currentTranscript = result.bestTranscription.formattedString
-                
-                if result.isFinal {
-                    self.handleRecognitionResult(self.currentTranscript)
-                }
+            self.currentTranscript = result.bestTranscription.formattedString
+            
+            if result.isFinal {
+                self.handleRecognitionResult(self.currentTranscript)
             }
             
-            if error != nil || (result?.isFinal ?? false) {
+            if error != nil || (result.isFinal ?? false) {
                 self.stopListening()
             }
         }
@@ -236,8 +233,6 @@ class SiriViewController: UIViewController {
     }
     
     private func addMessage(_ text: String, isUser: Bool) {
-        // 在实际应用中，这里会添加用户消息到聊天界面
-        // 由于界面是静态的，这里可能需要更新显示的内容
         if isUser {
             messageBlock.text = text
         }
@@ -250,12 +245,8 @@ class SiriViewController: UIViewController {
         }
         
         isLoading = true
-        
-        // 在实际应用中，这里会发送消息到服务器
-        // 由于界面是静态的，这里可能需要更新显示的内容
         addMessage("AI正在处理...", isUser: false)
         
-        // 模拟AI回复
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             self.addMessage("这是AI的回复内容", isUser: false)
             self.isLoading = false
@@ -289,25 +280,5 @@ extension UIColor {
         let b = CGFloat(rgb & 0x0000FF) / 255.0
         
         self.init(red: r, green: g, blue: b, alpha: 1.0)
-    }
-}
-
-extension UILabel {
-    var lineSpacing: CGFloat {
-        get {
-            guard let text = self.text, let font = self.font else { return 0 }
-            let attributedString = NSAttributedString(string: text, attributes: [NSAttributedString.Key.font: font])
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.lineSpacing = self.lineSpacing
-            let attributedStringWithLineSpacing = NSAttributedString(string: text, attributes: [NSAttributedString.Key.font: font, NSAttributedString.Key.paragraphStyle: paragraphStyle])
-            return paragraphStyle.lineSpacing
-        }
-        set {
-            guard let text = self.text, let font = self.font else { return }
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.lineSpacing = newValue
-            let attributedString = NSAttributedString(string: text, attributes: [NSAttributedString.Key.font: font, NSAttributedString.Key.paragraphStyle: paragraphStyle])
-            self.attributedText = attributedString
-        }
     }
 }
