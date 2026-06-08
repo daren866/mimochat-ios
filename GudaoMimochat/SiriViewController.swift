@@ -37,7 +37,7 @@ class SiriViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         setupSpeechRecognizer()
-        startListening()
+        requestPermissions()
     }
     
     override func viewDidDisappear(_ animated: Bool) {
@@ -199,6 +199,36 @@ class SiriViewController: UIViewController {
     private func setupSpeechRecognizer() {
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
         audioEngine = AVAudioEngine()
+    }
+    
+    private func requestPermissions() {
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized:
+                    print("语音识别权限已授权")
+                case .denied:
+                    self?.subtitleLabel.text = "语音识别权限被拒绝"
+                case .restricted:
+                    self?.subtitleLabel.text = "语音识别功能受限"
+                case .notDetermined:
+                    self?.subtitleLabel.text = "语音识别权限未确定"
+                @unknown default:
+                    break
+                }
+            }
+        }
+        
+        AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                if granted {
+                    print("麦克风权限已授权")
+                    self?.startListening()
+                } else {
+                    self?.subtitleLabel.text = "麦克风权限被拒绝"
+                }
+            }
+        }
     }
     
     private func startListening() {
