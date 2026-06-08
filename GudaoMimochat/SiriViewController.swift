@@ -60,7 +60,9 @@ class SiriViewController: UIViewController {
         
         contentView.translatesAutoresizingMaskIntoConstraints = false
         contentView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
+        // 改为只保留上方的圆角，贴合底部弹窗风格
         contentView.layer.cornerRadius = 24
+        contentView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         contentView.clipsToBounds = true
         view.addSubview(contentView)
         
@@ -139,10 +141,10 @@ class SiriViewController: UIViewController {
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            contentView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            contentView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            contentView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 30),
-            contentView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -30),
+            // 修改：将 contentView 固定在屏幕底部
+            contentView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
             
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40),
@@ -228,7 +230,6 @@ class SiriViewController: UIViewController {
             DispatchQueue.main.async {
                 if granted {
                     print("麦克风权限已授权")
-                    // 授权成功后自动开始听写（对应图3默认状态）
                     self?.startListening()
                 } else {
                     self?.subtitleLabel.text = "麦克风权限被拒绝"
@@ -271,12 +272,13 @@ class SiriViewController: UIViewController {
             
             if let result = result {
                 let transcript = result.bestTranscription.formattedString
+                // 如果识别已经彻底完成（用户停顿较久系统自动结束），自动处理识别结果
                 if result.isFinal {
                     self.handleRecognitionResult(transcript)
                 }
             }
             
-            // 如果发生错误或者识别结束，则停止听写
+            // 如果发生错误或者识别彻底结束，则停止听写引擎
             if error != nil || (result?.isFinal ?? false) {
                 self.stopListening()
             }
@@ -298,17 +300,14 @@ class SiriViewController: UIViewController {
         let trimmedText = text.trimmingCharacters(in: .whitespaces)
         
         if trimmedText.isEmpty {
-            // 未识别到有效语音，切换到图1（键盘输入模式）
             showChatInterface(isEmptyResult: true)
         } else {
-            // 识别到有效语音，正常展示并请求接口
             showChatInterface(isEmptyResult: false)
             addMessage(trimmedText, isUser: true)
             sendToMimo(trimmedText)
         }
     }
     
-    // 根据是否识别到内容切换不同UI状态
     private func showChatInterface(isEmptyResult: Bool = false) {
         if isEmptyResult {
             titleLabel.text = "未听清，请输入"
@@ -321,7 +320,6 @@ class SiriViewController: UIViewController {
         chatContainerView.isHidden = false
         inputContainerView.isHidden = false
         
-        // 自动弹出键盘
         inputTextField.becomeFirstResponder()
     }
     
@@ -521,6 +519,11 @@ class SiriViewController: UIViewController {
     
     @objc private func toggleListening() {
         if isListening {
+            // 修改：点击停止时，立即获取当前已识别的内容并处理
+            if let task = recognitionTask, let result = task.result {
+                let transcript = result.bestTranscription.formattedString
+                handleRecognitionResult(transcript)
+            }
             stopListening()
         } else {
             startListening()
@@ -528,7 +531,6 @@ class SiriViewController: UIViewController {
     }
     
     @objc private func toggleKeyboardMode() {
-        // 点击左下角键盘图标，主动切换到输入法模式
         showChatInterface(isEmptyResult: false)
     }
     
