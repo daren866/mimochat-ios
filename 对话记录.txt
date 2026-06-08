@@ -1,0 +1,21 @@
+fetch("https://aistudio.xiaomimimo.com/open-apis/bot/chat?xiaomichatbot_ph=ELjE%2FJoWhAXG%2ByRH0Qx%2BDw%3D%3D", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "system",
+    "cache-control": "no-cache",
+    "content-type": "application/json",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Chromium\";v=\"148\", \"Google Chrome\";v=\"148\", \"Not/A)Brand\";v=\"99\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "x-timezone": "Etc/GMT-8",
+    "cookie": "serviceToken=\"/vjQa88K2JeX+vuUvl6J6IfCi+dNJ179HhENo7BJqbRsM46pDgS0AGhvFtZTZFrqYNViqSrWIakt+QqY9SdeIj7UuxJcwKX8Dt4jVTp8R/x/27aPqQZueJMkTV0iPDr8ptiCPNd3QKYpqGouMeKHSeAoD/aNZMxaxooBNEsgUa1dp/HEXU5LVxEmeWDu1AJvc0fwpCYHcA+QxaMimtwDAt1te8Lzp6qCxpEdjtD7g87WFzvkI+12D5zTS/eHpoau57rwqHju4Cv59fMD/YEwstx2vUJvX8CByiaBL2L6KGaF21oEjtYCjRyAG2znrdksrLoWvkwZmzhwQYxwDO/eQu0ZgkzJKen95FT5SO+vgqc=\"; userId=2676228670; xiaomichatbot_ph=\"ELjE/JoWhAXG+yRH0Qx+Dw==\"",
+    "Referer": "https://aistudio.xiaomimimo.com/"
+  },
+  "body": "{\"msgId\":\"6cba667aeae71a486245e6ee0c99e5d5\",\"conversationId\":\"81f823388d0d4b83808484396a7ff366\",\"query\":\"你上次说了什么？\",\"isEditedQuery\":false,\"modelConfig\":{\"enableThinking\":false,\"webSearchStatus\":\"disabled\",\"model\":\"mimo-v2.5\",\"temperature\":0.8,\"topP\":0.95},\"multiMedias\":[]}",
+  "method": "POST"
+});

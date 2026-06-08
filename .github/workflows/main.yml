@@ -1,8 +1,7 @@
 name: Build GudaoMimochat IPA for TrollStore (iOS 15+ arm64)
 
 on:
-  push:
-    branches: [ main ]
+  push: # 每次有新提交就执行
   workflow_dispatch: # 允许手动触发
 
 jobs:

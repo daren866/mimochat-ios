@@ -495,7 +495,10 @@ struct ContentView: View {
                     isLoading: $isLoading,
                     currentConversationId: $currentConversationId,
                     loadChatRecords: loadChatRecords,
-                    saveToken: saveToken
+                    saveToken: saveToken,
+                    selectChatRecord: selectChatRecord,
+                    typeText: typeText,
+                    saveConversationId: saveConversationId
                 )
             } else {
                 WelcomeView(
@@ -610,7 +613,7 @@ struct ContentView: View {
                 onMessage: { content in
                     DispatchQueue.main.async {
                         if messageIndex < self.messages.count {
-                            self.typeText(content, at: messageIndex)
+                            typeText(content, messageIndex)
                         }
                     }
                 },
@@ -641,7 +644,7 @@ struct ContentView: View {
                 switch result {
                 case .success(let convId):
                     DispatchQueue.main.async {
-                        self.saveConversationId(convId)
+                        saveConversationId(convId)
                         sendChat(convId)
                     }
                 case .failure(let error):
@@ -794,6 +797,9 @@ struct ChatView: View {
     @Binding var currentConversationId: String?
     let loadChatRecords: () -> Void
     let saveToken: (String) -> Void
+    let selectChatRecord: (String) -> Void
+    let typeText: (String, Int) -> Void
+    let saveConversationId: (String) -> Void
 
     var body: some View {
         ZStack {
@@ -933,7 +939,7 @@ struct ChatView: View {
                 onMessage: { content in
                     DispatchQueue.main.async {
                         if messageIndex < self.messages.count {
-                            self.typeText(content, at: messageIndex)
+                            typeText(content, messageIndex)
                         }
                     }
                 },
@@ -964,7 +970,7 @@ struct ChatView: View {
                 switch result {
                 case .success(let convId):
                     DispatchQueue.main.async {
-                        self.saveConversationId(convId)
+                        saveConversationId(convId)
                         sendChat(convId)
                     }
                 case .failure(let error):
