@@ -9,28 +9,24 @@ class AppState: ObservableObject {
             object: nil,
             queue: .main
         ) { [self] notification in
-            // 修复：self 不是可选类型，直接赋值即可
             self.showSiriMode = true
             self.presentSiriViewController()
         }
     }
     
     private func presentSiriViewController() {
-        // 获取当前的 UIWindowScene
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let rootViewController = windowScene.windows.first?.rootViewController else {
             return
         }
         
-        // 获取最顶层的 ViewController
         var topController = rootViewController
         while let presentedViewController = topController.presentedViewController {
             topController = presentedViewController
         }
         
-        // 实例化并弹出 SiriViewController
         let siriVC = SiriViewController()
-        siriVC.modalPresentationStyle = .fullScreen // 设置为全屏模式
+        siriVC.modalPresentationStyle = .fullScreen
         topController.present(siriVC, animated: true)
     }
 }
@@ -525,7 +521,6 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
     }
     
     private func filterContent(_ content: String) -> String {
-        // 过滤控制字符
         let filtered = content.filter { char in
             let scalars = char.unicodeScalars
             for scalar in scalars {
@@ -536,7 +531,6 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
             return true
         }
         
-        // 过滤 thinking 标签
         if filtered == "熟虑" { return "" }
         if filtered.hasPrefix("熟虑") {
             if let endIndex = filtered.range(of: "</熟虑>")?.upperBound {
@@ -574,7 +568,6 @@ struct ContentView: View {
     
     var body: some View {
         Group {
-            // 移除了内嵌的 SiriModeView，改为通过 AppState 中转跳转
             if showChat {
                 ChatView(
                     messages: $messages,
@@ -1441,7 +1434,7 @@ struct MessageBubble: View {
     @State private var showActionSheet = false
     
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HBox(alignment: .top, spacing: 8) {
             if message.isUser {
                 Spacer(minLength: 50)
                 VStack(alignment: .trailing, spacing: 4) {
@@ -1515,7 +1508,7 @@ struct TokenUsageDetailView: View {
                             .padding(.horizontal, 20)
                         
                         TokenInfoRow(title: "缓存 Tokens", value: "\(usage.nativeUsage.prompt_tokens_details.cached_tokens)")
-                        TokenInfoRow(title: "推理 Tokens", value: "\(usage.nativeUsage.completion_tokens_details.reasoning_tokens}")
+                        TokenInfoRow(title: "推理 Tokens", value: "\(usage.nativeUsage.completion_tokens_details.reasoning_tokens)")
                     }
                     .padding(.horizontal, 20)
                 }
