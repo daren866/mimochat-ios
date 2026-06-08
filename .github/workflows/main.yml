@@ -16,34 +16,14 @@ jobs:
       with:
         xcode-version: 'latest'
 
-    - name: Install Tuist via Homebrew
-      run: |
-        brew update
-        brew install tuist
-        tuist version
-
-    - name: Generate Project with Tuist
-      run: |
-        tuist generate --no-open
-        echo "生成的项目文件："
-        ls -la *.xcodeproj || echo "未找到项目文件"
-
     - name: Build Xcode Archive
       run: |
-        # 查找Tuist生成的项目文件（动态查找，确保兼容性）
-        PROJECT_FILE=$(find . -maxdepth 1 -name "*.xcodeproj" | head -1)
-        if [ -z "$PROJECT_FILE" ]; then
-          echo "错误：未找到 .xcodeproj 文件"
-          exit 1
-        fi
-        PROJECT_NAME=$(basename "$PROJECT_FILE" .xcodeproj)
-
         # 使用GudaoMimochat作为主要Scheme名称
         BUILD_SCHEME="GudaoMimochat"
-        echo "使用项目: $PROJECT_NAME, Scheme: $BUILD_SCHEME"
+        echo "使用Scheme: $BUILD_SCHEME"
 
         xcodebuild clean archive \
-          -project "$PROJECT_NAME.xcodeproj" \
+          -project "GudaoMimochat.xcodeproj" \
           -scheme "$BUILD_SCHEME" \
           -configuration Release \
           -archivePath "$PWD/build/GudaoMimochat.xcarchive" \
