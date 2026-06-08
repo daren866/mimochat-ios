@@ -422,6 +422,7 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
     private let onError: (Error) -> Void
     private var buffer = ""
     private var currentEvent = ""
+    private var jsonBuffer = ""
     
     init(onMessage: @escaping (String) -> Void, onFinish: @escaping () -> Void, onError: @escaping (Error) -> Void) {
         self.onMessage = onMessage
@@ -461,11 +462,19 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
             let dataContent = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
             
             if currentEvent == "message" {
-                if let content = extractContent(from: dataContent) {
+                jsonBuffer += dataContent
+                
+                if let content = extractContent(from: jsonBuffer) {
+                    jsonBuffer = ""
                     DispatchQueue.main.async { self.onMessage(content) }
                 }
             } else if currentEvent == "finish" {
                 DispatchQueue.main.async { self.onFinish() }
+            }
+        } else if line.isEmpty && !jsonBuffer.isEmpty {
+            if let content = extractContent(from: jsonBuffer) {
+                jsonBuffer = ""
+                DispatchQueue.main.async { self.onMessage(content) }
             }
         }
     }
@@ -481,7 +490,8 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
                 return filterContent(content)
             }
         } catch {
-            print("Failed to parse SSE data: \(error)")
+            print("Failed to parse SSE data, buffering more...")
+            return nil
         }
         return nil
     }
