@@ -614,7 +614,9 @@ struct ContentView: View {
                     selectChatRecord: selectChatRecord,
                     appendText: appendText,
                     saveConversationId: saveConversationId,
-                    deleteAllChatRecords: deleteAllChatRecords
+                    deleteAllChatRecords: deleteAllChatRecords,
+                    siriModeEnabled: $siriModeEnabled,
+                    saveSiriModeSetting: saveSiriModeSetting
                 )
             } else {
                 WelcomeView(
@@ -968,6 +970,8 @@ struct ChatView: View {
     let appendText: (String, Int) -> Void
     let saveConversationId: (String) -> Void
     let deleteAllChatRecords: () -> Void
+    @Binding var siriModeEnabled: Bool
+    let saveSiriModeSetting: (Bool) -> Void
 
     var body: some View {
         ZStack {
