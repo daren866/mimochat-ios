@@ -586,7 +586,9 @@ struct ContentView: View {
     @State private var isLoading = false
     @State private var currentConversationId: String?
     @State private var errorMessage: String?
+    @State private var siriModeEnabled = false
     private let tokenKey = "mimoCookieToken"
+    private let siriModeKey = "siriModeEnabled"
     private let conversationIdKey = "mimoConversationId"
 
     var body: some View {
@@ -633,12 +635,25 @@ struct ContentView: View {
         }
         .onAppear {
             loadToken()
+            loadSiriModeSetting()
         }
     }
 
     private func saveToken(_ token: String) {
         mimoToken = token
         UserDefaults.standard.set(token, forKey: tokenKey)
+    }
+    
+    private func loadSiriModeSetting() {
+        siriModeEnabled = UserDefaults.standard.bool(forKey: siriModeKey)
+        if siriModeEnabled {
+            NotificationCenter.default.post(name: NSNotification.Name("OpenSiriMode"), object: nil)
+        }
+    }
+    
+    private func saveSiriModeSetting(_ enabled: Bool) {
+        siriModeEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: siriModeKey)
     }
 
     private func loadToken() {
@@ -914,7 +929,9 @@ struct WelcomeView: View {
                     showSettings: $showSettings,
                     mimoToken: mimoToken,
                     saveToken: saveToken,
-                    deleteAllChatRecords: deleteAllChatRecords
+                    deleteAllChatRecords: deleteAllChatRecords,
+                    siriModeEnabled: $siriModeEnabled,
+                    saveSiriModeSetting: saveSiriModeSetting
                 )
             }
 
@@ -1046,7 +1063,9 @@ struct ChatView: View {
                     showSettings: $showSettings,
                     mimoToken: mimoToken,
                     saveToken: saveToken,
-                    deleteAllChatRecords: deleteAllChatRecords
+                    deleteAllChatRecords: deleteAllChatRecords,
+                    siriModeEnabled: $siriModeEnabled,
+                    saveSiriModeSetting: saveSiriModeSetting
                 )
             }
 
@@ -1172,6 +1191,8 @@ struct SettingsView: View {
     let mimoToken: String
     let saveToken: (String) -> Void
     let deleteAllChatRecords: () -> Void
+    @Binding var siriModeEnabled: Bool
+    let saveSiriModeSetting: (Bool) -> Void
     @State private var showTokenView = false
     @State private var showDeleteConfirm = false
 
@@ -1201,6 +1222,17 @@ struct SettingsView: View {
                 .padding(.bottom, 20)
 
                 VStack(spacing: 20) {
+                    HStack {
+                        Text("Siri模式")
+                            .font(.title)
+                            .foregroundColor(.black)
+                        Spacer()
+                        Toggle("", isOn: $siriModeEnabled)
+                            .onChange(of: siriModeEnabled) { newValue in
+                                saveSiriModeSetting(newValue)
+                            }
+                    }
+
                     Button(action: {
                         showDeleteConfirm = true
                     }) {

@@ -7,6 +7,7 @@ class SiriViewController: UIViewController {
     private let contentView = UIView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
+    private let settingsButton = UIButton(type: .system)
     private let chatContainerView = UIView()
     private let messagesScrollView = UIScrollView()
     private let messagesStackView = UIStackView()
@@ -66,6 +67,12 @@ class SiriViewController: UIViewController {
         titleLabel.textColor = .black
         titleLabel.textAlignment = .center
         contentView.addSubview(titleLabel)
+        
+        settingsButton.translatesAutoresizingMaskIntoConstraints = false
+        settingsButton.setImage(UIImage(systemName: "gear"), for: .normal)
+        settingsButton.tintColor = .black
+        settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
+        contentView.addSubview(settingsButton)
         
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         subtitleLabel.text = "语音听写已开启"
@@ -137,6 +144,11 @@ class SiriViewController: UIViewController {
             
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40),
             titleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            
+            settingsButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            settingsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            settingsButton.widthAnchor.constraint(equalToConstant: 44),
+            settingsButton.heightAnchor.constraint(equalToConstant: 44),
             
             subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
             subtitleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
@@ -499,6 +511,10 @@ class SiriViewController: UIViewController {
         inputTextField.text = ""
         addMessage(text, isUser: true)
         sendToMimo(text)
+    }
+    
+    @objc private func openSettings() {
+        dismiss(animated: true)
     }
 }
 
