@@ -103,7 +103,7 @@ class SiriViewController: UIViewController {
             bubbleContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: view.bounds.width * 0.05),
             bubbleContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -view.bounds.width * 0.05),
             bubbleContainer.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            bubbleContainer.heightAnchor.constraint(equalTo: view.bounds.height * 0.45),
+            bubbleContainer.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.45), // 修复：使用 multiply(by:)
             
             // 标题标签位置：x: 0, y: 0, width: 1, height: 0.1
             titleLabel.topAnchor.constraint(equalTo: bubbleContainer.topAnchor, constant: 20),
@@ -193,7 +193,7 @@ class SiriViewController: UIViewController {
                 self.handleRecognitionResult(self.currentTranscript)
             }
             
-            if error != nil || result.isFinal { // 修复：移除 ?? false
+            if error != nil || result.isFinal {
                 self.stopListening()
             }
         }
