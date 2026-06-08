@@ -7,7 +7,6 @@ class SiriViewController: UIViewController {
     private let container = UIView()
     private let titleLabel = UILabel()
     private let userTextLabel = UILabel()
-    // 替换为 UITextView 以支持多行滚动
     private let aiTextView = UITextView()
     private let voiceButton = UIButton(type: .system)
     
@@ -27,7 +26,8 @@ class SiriViewController: UIViewController {
     private let conversationIdKey = "mimoConversationId"
     
     private var mimoToken: String {
-        UserDefaults.standard.string(forKey: tokenKey) ?? ""
+        // 过滤掉可能因复制产生的换行符和空格，防止请求头损坏导致超时
+        (UserDefaults.standard.string(forKey: tokenKey) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     override func viewDidLoad() {
@@ -63,7 +63,6 @@ class SiriViewController: UIViewController {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
         backgroundView.addGestureRecognizer(tapGesture)
         
-        // 容器始终固定在底部，高度占屏幕 0.55
         container.translatesAutoresizingMaskIntoConstraints = false
         container.backgroundColor = UIColor(hex: "#e0e0e0")
         container.layer.cornerRadius = 30
@@ -88,7 +87,6 @@ class SiriViewController: UIViewController {
         userTextLabel.numberOfLines = 0
         container.addSubview(userTextLabel)
         
-        // 使用 UITextView 替换 UILabel，支持滚动
         aiTextView.translatesAutoresizingMaskIntoConstraints = false
         aiTextView.font = UIFont.systemFont(ofSize: 24)
         aiTextView.textColor = .black
@@ -118,7 +116,6 @@ class SiriViewController: UIViewController {
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 固定在底部，不随状态改变位置和大小
             container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             container.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             container.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -133,7 +130,6 @@ class SiriViewController: UIViewController {
             userTextLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
             userTextLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 30),
             
-            // AI回复区域：从用户文本下方开始，一直延伸到按钮上方
             aiTextView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
             aiTextView.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
             aiTextView.topAnchor.constraint(equalTo: userTextLabel.bottomAnchor, constant: 15),
@@ -281,28 +277,28 @@ class SiriViewController: UIViewController {
     }
     
     private func transitionToResponseState(userText: String) {
-        // 隐藏初始界面的问候语
         titleLabel.isHidden = true
         
-        // 显示对话内容
         userTextLabel.text = userText
         aiTextView.text = ""
         userTextLabel.isHidden = false
         aiTextView.isHidden = false
-        
-        // 容器位置固定不动，不需要改变约束
     }
     
     private func appendMessage(_ text: String, isUser: Bool) {
+        // 过滤空字符串，防止无意义刷新和滚动越界
+        if text.isEmpty { return }
+        
         if isUser {
             userTextLabel.text = text
         } else {
-            let currentText = aiTextView.text ?? ""
-            aiTextView.text = currentText + text
+            aiTextView.text = (aiTextView.text ?? "") + text
             
             // 自动滚动到最底部
-            let range = NSMakeRange(aiTextView.text.count - 1, 1)
-            aiTextView.scrollRangeToVisible(range)
+            if !aiTextView.text.isEmpty {
+                let range = NSMakeRange(aiTextView.text.count - 1, 1)
+                aiTextView.scrollRangeToVisible(range)
+            }
         }
     }
     
@@ -324,22 +320,18 @@ class SiriViewController: UIViewController {
                 message: text,
                 conversationId: convId,
                 onMessage: { content in
-                    DispatchQueue.main.async {
-                        self.appendMessage(content, isUser: false)
-                    }
+                    // NetworkManager已在主线程回调，无需再切主线程
+                    self.appendMessage(content, isUser: false)
                 },
                 onFinish: {
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        self.updateVoiceButtonTitle()
-                    }
+                    self.isLoading = false
+                    self.updateVoiceButtonTitle()
                 },
                 onError: { error in
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        self.appendMessage("\n网络错误: \(error.localizedDescription)", isUser: false)
-                        self.updateVoiceButtonTitle()
-                    }
+                    self.isLoading = false
+                    // 如果遇到网络错误，直接替换显示错误信息
+                    self.aiTextView.text = "网络错误: \(error.localizedDescription)"
+                    self.updateVoiceButtonTitle()
                 }
             )
         }
@@ -354,14 +346,12 @@ class SiriViewController: UIViewController {
             ) { result in
                 switch result {
                 case .success(let convId):
-                    DispatchQueue.main.async {
-                        self.saveConversationId(convId)
-                        sendChat(convId)
-                    }
+                    self.saveConversationId(convId)
+                    sendChat(convId)
                 case .failure(let error):
                     DispatchQueue.main.async {
                         self.isLoading = false
-                        self.appendMessage("\n创建对话失败：\(error.localizedDescription)", isUser: false)
+                        self.aiTextView.text = "创建对话失败：\(error.localizedDescription)"
                         self.updateVoiceButtonTitle()
                     }
                 }
