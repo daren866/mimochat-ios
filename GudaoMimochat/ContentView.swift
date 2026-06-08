@@ -420,9 +420,9 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
     private let onMessage: (String) -> Void
     private let onFinish: () -> Void
     private let onError: (Error) -> Void
-    private var buffer = ""
+    private var rawDataBuffer = Data()
+    private var eventBuffer = ""
     private var currentEvent = ""
-    private var jsonBuffer = ""
     
     init(onMessage: @escaping (String) -> Void, onFinish: @escaping () -> Void, onError: @escaping (Error) -> Void) {
         self.onMessage = onMessage
@@ -431,10 +431,8 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
     }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        if let newString = String(data: data, encoding: .utf8) {
-            buffer += newString
-            processBuffer()
-        }
+        rawDataBuffer.append(data)
+        processRawDataBuffer()
     }
     
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
@@ -442,16 +440,19 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
         if let error = error {
             DispatchQueue.main.async { self.onError(error) }
         } else {
-            processBuffer()
+            processRawDataBuffer()
             DispatchQueue.main.async { self.onFinish() }
         }
     }
     
-    private func processBuffer() {
-        while let lineEndIndex = buffer.firstIndex(of: "\n") {
-            let line = String(buffer[..<lineEndIndex])
-            buffer = String(buffer[buffer.index(after: lineEndIndex)...])
-            processLine(line)
+    private func processRawDataBuffer() {
+        while let newlineRange = rawDataBuffer.range(of: Data([0x0A])) {
+            let lineData = rawDataBuffer[..<newlineRange.lowerBound]
+            rawDataBuffer = rawDataBuffer[newlineRange.upperBound...]
+            
+            if let line = String(data: lineData, encoding: .utf8) {
+                processLine(line)
+            }
         }
     }
     
@@ -462,25 +463,17 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
             let dataContent = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
             
             if currentEvent == "message" {
-                jsonBuffer += dataContent
-                
-                if let content = extractContent(from: jsonBuffer) {
-                    jsonBuffer = ""
+                if let content = parseAndExtractContent(from: dataContent) {
                     DispatchQueue.main.async { self.onMessage(content) }
                 }
             } else if currentEvent == "finish" {
                 DispatchQueue.main.async { self.onFinish() }
             }
-        } else if line.isEmpty && !jsonBuffer.isEmpty {
-            if let content = extractContent(from: jsonBuffer) {
-                jsonBuffer = ""
-                DispatchQueue.main.async { self.onMessage(content) }
-            }
         }
     }
     
-    private func extractContent(from data: String) -> String? {
-        guard let jsonData = data.data(using: .utf8) else { return nil }
+    private func parseAndExtractContent(from dataString: String) -> String? {
+        guard !dataString.isEmpty, let jsonData = dataString.data(using: .utf8) else { return nil }
         
         do {
             if let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
@@ -490,8 +483,7 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
                 return filterContent(content)
             }
         } catch {
-            print("Failed to parse SSE data, buffering more...")
-            return nil
+            print("JSON parse failed: \(error)")
         }
         return nil
     }
