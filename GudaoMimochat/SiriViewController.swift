@@ -1,5 +1,6 @@
 import UIKit
 import Speech
+import AVFoundation // 引入语音合成框架
 
 class SiriViewController: UIViewController {
     
@@ -20,13 +21,15 @@ class SiriViewController: UIViewController {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine: AVAudioEngine?
     
+    // 语音合成器
+    private let speechSynthesizer = AVSpeechSynthesizer()
+    
     private var currentTranscript: String = ""
     
     private let tokenKey = "mimoCookieToken"
     private let conversationIdKey = "mimoConversationId"
     
     private var mimoToken: String {
-        // 过滤掉可能因复制产生的换行符和空格，防止请求头损坏导致超时
         (UserDefaults.standard.string(forKey: tokenKey) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
@@ -41,6 +44,10 @@ class SiriViewController: UIViewController {
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         stopListening()
+        // 退出界面时停止朗读
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
     }
     
     private func loadConversationId() {
@@ -182,6 +189,11 @@ class SiriViewController: UIViewController {
             return
         }
         
+        // 用户开始说话时，如果AI正在朗读，立刻打断（Siri核心交互逻辑）
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        
         stopListening()
         currentTranscript = ""
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
@@ -286,7 +298,6 @@ class SiriViewController: UIViewController {
     }
     
     private func appendMessage(_ text: String, isUser: Bool) {
-        // 过滤空字符串，防止无意义刷新和滚动越界
         if text.isEmpty { return }
         
         if isUser {
@@ -294,12 +305,37 @@ class SiriViewController: UIViewController {
         } else {
             aiTextView.text = (aiTextView.text ?? "") + text
             
-            // 自动滚动到最底部
             if !aiTextView.text.isEmpty {
                 let range = NSMakeRange(aiTextView.text.count - 1, 1)
                 aiTextView.scrollRangeToVisible(range)
             }
         }
+    }
+    
+    // MARK: - 语音朗读功能
+    private func speakText(_ text: String) {
+        guard !text.isEmpty else { return }
+        
+        // 如果正在朗读，先停止
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        
+        let utterance = AVSpeechUtterance(string: text)
+        // 设置为中文女声 (zh-CN 默认就是女声)
+        utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
+        // 语速：默认语速稍微慢一点点更像Siri，可按需微调 (0.0 - 1.0)
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.95
+        
+        // 朗读前需要激活音频会话，否则可能和录音冲突导致没声音
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: .defaultToSpeaker)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("音频会话设置失败: \(error)")
+        }
+        
+        speechSynthesizer.speak(utterance)
     }
     
     // MARK: - 网络请求
@@ -320,16 +356,18 @@ class SiriViewController: UIViewController {
                 message: text,
                 conversationId: convId,
                 onMessage: { content in
-                    // NetworkManager已在主线程回调，无需再切主线程
                     self.appendMessage(content, isUser: false)
                 },
                 onFinish: {
                     self.isLoading = false
                     self.updateVoiceButtonTitle()
+                    // 网络请求结束，开始朗读完整的回复内容
+                    if let responseText = self.aiTextView.text {
+                        self.speakText(responseText)
+                    }
                 },
                 onError: { error in
                     self.isLoading = false
-                    // 如果遇到网络错误，直接替换显示错误信息
                     self.aiTextView.text = "网络错误: \(error.localizedDescription)"
                     self.updateVoiceButtonTitle()
                 }
