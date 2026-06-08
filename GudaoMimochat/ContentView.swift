@@ -444,7 +444,7 @@ struct ContentView: View {
         if let convId = currentConversationId {
             sendChat(convId)
         } else {
-            let newConversationId = UUID().uuidString.lowercased()
+            let newConversationId = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
             NetworkManager.shared.createConversation(
                 token: token,
                 conversationId: newConversationId
@@ -765,7 +765,7 @@ struct ChatView: View {
         if let convId = currentConversationId {
             sendChat(convId)
         } else {
-            let newConversationId = UUID().uuidString.lowercased()
+            let newConversationId = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
             NetworkManager.shared.createConversation(
                 token: token,
                 conversationId: newConversationId
