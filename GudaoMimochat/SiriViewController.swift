@@ -104,14 +104,13 @@ class SiriViewController: UIViewController {
         
         // 长按输入语音按钮
         voiceButton.translatesAutoresizingMaskIntoConstraints = false
-        voiceButton.setTitle("点击输入语音", for: .normal) // 初始提示为点击
+        voiceButton.setTitle("点击输入语音", for: .normal)
         voiceButton.titleLabel?.font = UIFont.systemFont(ofSize: 32)
         voiceButton.setTitleColor(.black, for: .normal)
         voiceButton.backgroundColor = UIColor(hex: "#e0e0e0")
         voiceButton.layer.cornerRadius = 20
         voiceButton.layer.borderWidth = 2
         voiceButton.layer.borderColor = UIColor(hex: "#666666").cgColor
-        // 初始状态添加点击事件
         voiceButton.addTarget(self, action: #selector(handleTapAction), for: .touchUpInside)
         container.addSubview(voiceButton)
         
@@ -133,31 +132,26 @@ class SiriViewController: UIViewController {
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 激活初始状态约束
             containerLeadingInitial,
             containerTrailingInitial,
             containerBottomInitial,
             containerHeightInitial,
             
-            // 标题标签位置：x: 0.05, y: 0.35, width: 0.9, height: 0.2
             titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
             titleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
             titleLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -40),
             titleLabel.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.2),
             
-            // 用户回复文本标签位置：x: 0.05, y: 0.05, width: 0.9, height: 0.08
             userTextLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
             userTextLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
             userTextLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 20),
             userTextLabel.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.08),
             
-            // AI回复文本块位置：x: 0.05, y: 0.15, width: 0.9, height: 0.65
             aiTextBlock.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
             aiTextBlock.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
             aiTextBlock.topAnchor.constraint(equalTo: container.topAnchor, constant: 60),
             aiTextBlock.heightAnchor.constraint(equalTo: container.heightAnchor, multiplier: 0.65),
             
-            // 按钮位置：x: 0.05, y: 0.85, width: 0.9, height: 0.12
             voiceButton.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
             voiceButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
             voiceButton.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -40),
@@ -250,29 +244,24 @@ class SiriViewController: UIViewController {
         isListening = false
     }
     
-    // 第一次点击事件处理
     @objc private func handleTapAction() {
         if isFirstInteraction {
             if isListening {
-                // 第二次点击：停止监听并发送
                 stopListening()
                 handleRecognitionResult(currentTranscript)
                 
-                // 切换为长按模式
                 isFirstInteraction = false
                 voiceButton.removeTarget(self, action: #selector(handleTapAction), for: .touchUpInside)
                 let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPressAction))
                 voiceButton.addGestureRecognizer(longPressGesture)
                 voiceButton.setTitle("长按输入语音", for: .normal)
             } else {
-                // 第一次点击：开始监听
                 startListening()
                 voiceButton.setTitle("点击停止", for: .normal)
             }
         }
     }
     
-    // 第二次及以后长按事件处理
     @objc private func handleLongPressAction(_ gesture: UILongPressGestureRecognizer) {
         if !isFirstInteraction {
             if gesture.state == .began {
@@ -290,31 +279,26 @@ class SiriViewController: UIViewController {
         let trimmedText = text.trimmingCharacters(in: .whitespaces)
         
         if trimmedText.isEmpty {
-            // 如果没有听清，继续保持当前模式
             if isFirstInteraction {
                 voiceButton.setTitle("点击输入语音", for: .normal)
             } else {
                 voiceButton.setTitle("长按输入语音", for: .normal)
             }
         } else {
-            // 语音输入完成后，切换到回复状态
             transitionToResponseState(userText: trimmedText)
             sendToMimo(trimmedText)
         }
     }
     
     private func transitionToResponseState(userText: String) {
-        // 删除"有什么需要帮助的？"文字
         titleLabel.text = ""
         
-        // 显示用户输入和AI回复
         userTextLabel.text = userText
         aiTextBlock.text = "AI正在处理..."
         
         userTextLabel.isHidden = false
         aiTextBlock.isHidden = false
         
-        // 切换约束：从初始状态到回复状态
         NSLayoutConstraint.deactivate([
             containerLeadingInitial,
             containerTrailingInitial,
@@ -342,6 +326,7 @@ class SiriViewController: UIViewController {
         }
     }
     
+    // MARK: - 真实网络请求
     private func sendToMimo(_ text: String) {
         guard !mimoToken.isEmpty else {
             addMessage("请先在设置中配置 Token", isUser: false)
@@ -350,11 +335,75 @@ class SiriViewController: UIViewController {
         
         isLoading = true
         
-        // 模拟网络请求
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.addMessage("这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在", isUser: false)
-            self.isLoading = false
+        // 替换为您真实的 Mimo API 地址
+        guard let url = URL(string: "https://api.mimu.chat/v1/chat/completions") else {
+            addMessage("API 地址配置错误", isUser: false)
+            isLoading = false
+            return
         }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(mimoToken)", forHTTPHeaderField: "Authorization")
+        
+        // 构建请求参数，根据 Mimo 实际要求调整
+        let body: [String: Any] = [
+            "model": "mimo", // 视实际情况修改
+            "messages": [["role": "user", "content": text]],
+            "stream": false
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            addMessage("请求构建失败", isUser: false)
+            isLoading = false
+            return
+        }
+        
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isLoading = false
+                
+                if let error = error {
+                    self.addMessage("网络错误: \(error.localizedDescription)", isUser: false)
+                    return
+                }
+                
+                guard let data = data else {
+                    self.addMessage("未收到数据", isUser: false)
+                    return
+                }
+                
+                // 解析返回的 JSON 数据，提取 AI 的回复
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let choices = json["choices"] as? [[String: Any]],
+                       let firstChoice = choices.first,
+                       let message = firstChoice["message"] as? [String: Any],
+                       let content = message["content"] as? String {
+                        
+                        // 更新到 UI 上
+                        self.addMessage(content, isUser: false)
+                        
+                        // 如果 API 返回了 conversationId，可以将其保存下来以便下次传入
+                        if let convId = json["id"] as? String {
+                            self.currentConversationId = convId
+                            UserDefaults.standard.set(convId, forKey: self.conversationIdKey)
+                        }
+                        
+                    } else {
+                        self.addMessage("解析响应失败", isUser: false)
+                    }
+                } catch {
+                    self.addMessage("JSON 解析错误", isUser: false)
+                }
+            }
+        }
+        
+        task.resume()
     }
     
     @objc private func handleBackgroundTap() {
