@@ -81,6 +81,12 @@ class SiriViewController: UIViewController {
         subtitleLabel.textAlignment = .center
         contentView.addSubview(subtitleLabel)
         
+        keyboardButton.translatesAutoresizingMaskIntoConstraints = false
+        keyboardButton.setImage(UIImage(systemName: "keyboard"), for: .normal)
+        keyboardButton.tintColor = .black
+        keyboardButton.addTarget(self, action: #selector(toggleKeyboardMode), for: .touchUpInside)
+        contentView.addSubview(keyboardButton)
+        
         chatContainerView.translatesAutoresizingMaskIntoConstraints = false
         chatContainerView.isHidden = true
         contentView.addSubview(chatContainerView)
@@ -158,6 +164,11 @@ class SiriViewController: UIViewController {
             speakButton.widthAnchor.constraint(equalToConstant: 200),
             speakButton.heightAnchor.constraint(equalToConstant: 60),
             speakButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
+            
+            keyboardButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            keyboardButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -50),
+            keyboardButton.widthAnchor.constraint(equalToConstant: 36),
+            keyboardButton.heightAnchor.constraint(equalToConstant: 36),
             
             chatContainerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             chatContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
@@ -519,15 +530,8 @@ class SiriViewController: UIViewController {
     }
     
     @objc private func toggleKeyboardMode() {
-        if inputTextField.isHidden {
-            inputTextField.isHidden = false
-            sendButton.isHidden = false
-            speakButton.isHidden = true
-        } else {
-            inputTextField.isHidden = true
-            sendButton.isHidden = true
-            speakButton.isHidden = false
-        }
+        showChatInterface()
+        inputTextField.becomeFirstResponder()
     }
     
     @objc private func textFieldDidReturn() {
