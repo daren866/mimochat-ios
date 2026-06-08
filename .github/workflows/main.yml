@@ -19,7 +19,7 @@ jobs:
     - name: Install Tuist
       run: |
         echo "🔧 安装 Tuist..."
-        curl -Ls https://install.tuist.io | bash
+        brew install tuist
         echo "✅ Tuist 安装完成"
 
     - name: Generate Xcode Project
