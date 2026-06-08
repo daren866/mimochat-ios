@@ -8,19 +8,23 @@ class SiriViewController: UIViewController {
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let settingsButton = UIButton(type: .system)
+    
     private let chatContainerView = UIView()
     private let messagesScrollView = UIScrollView()
     private let messagesStackView = UIStackView()
+    
     private let inputContainerView = UIView()
     private let keyboardButton = UIButton(type: .system)
     private let inputTextField = UITextField()
     private let sendButton = UIButton(type: .system)
+    
     private let speakButton = UIButton(type: .system)
     
     private var messages: [Message] = []
     private var isListening = false
     private var isLoading = false
     private var currentConversationId: String?
+    
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
@@ -51,7 +55,6 @@ class SiriViewController: UIViewController {
         backgroundView.translatesAutoresizingMaskIntoConstraints = false
         backgroundView.backgroundColor = UIColor(white: 0.6, alpha: 1.0)
         view.addSubview(backgroundView)
-        
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
         backgroundView.addGestureRecognizer(tapGesture)
         
@@ -81,11 +84,16 @@ class SiriViewController: UIViewController {
         subtitleLabel.textAlignment = .center
         contentView.addSubview(subtitleLabel)
         
-        keyboardButton.translatesAutoresizingMaskIntoConstraints = false
-        keyboardButton.setImage(UIImage(systemName: "keyboard"), for: .normal)
-        keyboardButton.tintColor = .black
-        keyboardButton.addTarget(self, action: #selector(toggleKeyboardMode), for: .touchUpInside)
-        contentView.addSubview(keyboardButton)
+        speakButton.translatesAutoresizingMaskIntoConstraints = false
+        speakButton.setTitle("按我说话", for: .normal)
+        speakButton.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
+        speakButton.setTitleColor(.black, for: .normal)
+        speakButton.backgroundColor = .white
+        speakButton.layer.cornerRadius = 30
+        speakButton.layer.borderWidth = 2
+        speakButton.layer.borderColor = UIColor.black.cgColor
+        speakButton.addTarget(self, action: #selector(toggleListening), for: .touchUpInside)
+        contentView.addSubview(speakButton)
         
         chatContainerView.translatesAutoresizingMaskIntoConstraints = false
         chatContainerView.isHidden = true
@@ -105,7 +113,7 @@ class SiriViewController: UIViewController {
         contentView.addSubview(inputContainerView)
         
         keyboardButton.translatesAutoresizingMaskIntoConstraints = false
-        keyboardButton.setImage(UIImage(systemName: "textformat"), for: .normal)
+        keyboardButton.setImage(UIImage(systemName: "keyboard"), for: .normal)
         keyboardButton.tintColor = .black
         keyboardButton.addTarget(self, action: #selector(toggleKeyboardMode), for: .touchUpInside)
         inputContainerView.addSubview(keyboardButton)
@@ -124,17 +132,6 @@ class SiriViewController: UIViewController {
         sendButton.layer.cornerRadius = 8
         sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
         inputContainerView.addSubview(sendButton)
-        
-        speakButton.translatesAutoresizingMaskIntoConstraints = false
-        speakButton.setTitle("按我说话", for: .normal)
-        speakButton.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
-        speakButton.setTitleColor(.black, for: .normal)
-        speakButton.backgroundColor = .white
-        speakButton.layer.cornerRadius = 30
-        speakButton.layer.borderWidth = 2
-        speakButton.layer.borderColor = UIColor.black.cgColor
-        speakButton.addTarget(self, action: #selector(toggleListening), for: .touchUpInside)
-        contentView.addSubview(speakButton)
         
         NSLayoutConstraint.activate([
             backgroundView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -165,6 +162,7 @@ class SiriViewController: UIViewController {
             speakButton.heightAnchor.constraint(equalToConstant: 60),
             speakButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
             
+            // 默认界面的键盘切换按钮，位于左下角
             keyboardButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             keyboardButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -50),
             keyboardButton.widthAnchor.constraint(equalToConstant: 36),
@@ -191,6 +189,7 @@ class SiriViewController: UIViewController {
             inputContainerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
             inputContainerView.heightAnchor.constraint(equalToConstant: 50),
             
+            // 聊天界面的键盘切换按钮布局
             keyboardButton.centerYAnchor.constraint(equalTo: inputContainerView.centerYAnchor),
             keyboardButton.leadingAnchor.constraint(equalTo: inputContainerView.leadingAnchor),
             keyboardButton.widthAnchor.constraint(equalToConstant: 44),
@@ -216,16 +215,11 @@ class SiriViewController: UIViewController {
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             DispatchQueue.main.async {
                 switch status {
-                case .authorized:
-                    print("语音识别权限已授权")
-                case .denied:
-                    self?.subtitleLabel.text = "语音识别权限被拒绝"
-                case .restricted:
-                    self?.subtitleLabel.text = "语音识别功能受限"
-                case .notDetermined:
-                    self?.subtitleLabel.text = "语音识别权限未确定"
-                @unknown default:
-                    break
+                case .authorized: print("语音识别权限已授权")
+                case .denied: self?.subtitleLabel.text = "语音识别权限被拒绝"
+                case .restricted: self?.subtitleLabel.text = "语音识别功能受限"
+                case .notDetermined: self?.subtitleLabel.text = "语音识别权限未确定"
+                @unknown default: break
                 }
             }
         }
@@ -234,6 +228,7 @@ class SiriViewController: UIViewController {
             DispatchQueue.main.async {
                 if granted {
                     print("麦克风权限已授权")
+                    // 授权成功后自动开始听写（对应图3默认状态）
                     self?.startListening()
                 } else {
                     self?.subtitleLabel.text = "麦克风权限被拒绝"
@@ -250,24 +245,23 @@ class SiriViewController: UIViewController {
             return
         }
         
+        stopListening()
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else { return }
-        
         recognitionRequest.shouldReportPartialResults = true
         
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
             recognitionRequest.append(buffer)
         }
         
         audioEngine.prepare()
-        
         do {
             try audioEngine.start()
             isListening = true
             subtitleLabel.text = "正在听..."
+            speakButton.setTitle("停止", for: .normal)
         } catch {
             print("启动音频引擎失败: \(error)")
         }
@@ -282,6 +276,7 @@ class SiriViewController: UIViewController {
                 }
             }
             
+            // 如果发生错误或者识别结束，则停止听写
             if error != nil || (result?.isFinal ?? false) {
                 self.stopListening()
             }
@@ -291,29 +286,43 @@ class SiriViewController: UIViewController {
     private func stopListening() {
         recognitionTask?.cancel()
         recognitionTask = nil
-        
         audioEngine?.stop()
         audioEngine?.inputNode.removeTap(onBus: 0)
-        
         recognitionRequest = nil
         isListening = false
         subtitleLabel.text = "语音听写已开启"
+        speakButton.setTitle("按我说话", for: .normal)
     }
     
     private func handleRecognitionResult(_ text: String) {
-        guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let trimmedText = text.trimmingCharacters(in: .whitespaces)
         
-        showChatInterface()
-        addMessage(text, isUser: true)
-        sendToMimo(text)
+        if trimmedText.isEmpty {
+            // 未识别到有效语音，切换到图1（键盘输入模式）
+            showChatInterface(isEmptyResult: true)
+        } else {
+            // 识别到有效语音，正常展示并请求接口
+            showChatInterface(isEmptyResult: false)
+            addMessage(trimmedText, isUser: true)
+            sendToMimo(trimmedText)
+        }
     }
     
-    private func showChatInterface() {
-        titleLabel.text = "Mimo siri"
+    // 根据是否识别到内容切换不同UI状态
+    private func showChatInterface(isEmptyResult: Bool = false) {
+        if isEmptyResult {
+            titleLabel.text = "未听清，请输入"
+        } else {
+            titleLabel.text = "Mimo siri"
+        }
+        
         subtitleLabel.isHidden = true
         speakButton.isHidden = true
         chatContainerView.isHidden = false
         inputContainerView.isHidden = false
+        
+        // 自动弹出键盘
+        inputTextField.becomeFirstResponder()
     }
     
     private func addMessage(_ text: String, isUser: Bool) {
@@ -325,7 +334,6 @@ class SiriViewController: UIViewController {
         
         let messageView = UIView()
         messageView.translatesAutoresizingMaskIntoConstraints = false
-        
         messageLabel.translatesAutoresizingMaskIntoConstraints = false
         messageView.addSubview(messageLabel)
         
@@ -344,13 +352,11 @@ class SiriViewController: UIViewController {
             let container = UIView()
             container.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(messageView)
-            
             NSLayoutConstraint.activate([
                 messageView.topAnchor.constraint(equalTo: container.topAnchor),
                 messageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
                 container.heightAnchor.constraint(equalTo: messageView.heightAnchor)
             ])
-            
             messagesStackView.addArrangedSubview(container)
         } else {
             messageLabel.textColor = .black
@@ -367,13 +373,11 @@ class SiriViewController: UIViewController {
             let container = UIView()
             container.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(messageView)
-            
             NSLayoutConstraint.activate([
                 messageView.topAnchor.constraint(equalTo: container.topAnchor),
                 messageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
                 container.heightAnchor.constraint(equalTo: messageView.heightAnchor)
             ])
-            
             messagesStackView.addArrangedSubview(container)
         }
         
@@ -393,7 +397,6 @@ class SiriViewController: UIViewController {
         }
         
         isLoading = true
-        
         messages.append(Message(text: "", isUser: false))
         
         let loadingLabel = UILabel()
@@ -435,7 +438,6 @@ class SiriViewController: UIViewController {
         
         let sendChat = { [weak self] (convId: String) in
             guard let self = self else { return }
-            
             NetworkManager.shared.sendChatMessage(
                 token: self.mimoToken,
                 message: text,
@@ -445,7 +447,6 @@ class SiriViewController: UIViewController {
                         if let loadingContainer = self.messagesStackView.viewWithTag(999) {
                             loadingContainer.removeFromSuperview()
                         }
-                        
                         if self.messages.count > 0 {
                             self.messages[self.messages.count - 1].text.append(content)
                             self.updateLastMessage(content)
@@ -481,7 +482,6 @@ class SiriViewController: UIViewController {
                 conversationId: newConversationId
             ) { [weak self] result in
                 guard let self = self else { return }
-                
                 switch result {
                 case .success(let convId):
                     DispatchQueue.main.async {
@@ -522,16 +522,14 @@ class SiriViewController: UIViewController {
     @objc private func toggleListening() {
         if isListening {
             stopListening()
-            speakButton.setTitle("按我说话", for: .normal)
         } else {
             startListening()
-            speakButton.setTitle("停止", for: .normal)
         }
     }
     
     @objc private func toggleKeyboardMode() {
-        showChatInterface()
-        inputTextField.becomeFirstResponder()
+        // 点击左下角键盘图标，主动切换到输入法模式
+        showChatInterface(isEmptyResult: false)
     }
     
     @objc private func textFieldDidReturn() {
@@ -540,7 +538,6 @@ class SiriViewController: UIViewController {
     
     @objc private func sendMessage() {
         guard let text = inputTextField.text, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        
         inputTextField.text = ""
         addMessage(text, isUser: true)
         sendToMimo(text)
