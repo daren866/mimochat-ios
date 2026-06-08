@@ -511,7 +511,8 @@ struct ContentView: View {
                     isLoading: $isLoading,
                     errorMessage: $errorMessage,
                     loadChatRecords: loadChatRecords,
-                    saveToken: saveToken
+                    saveToken: saveToken,
+                    selectChatRecord: selectChatRecord
                 )
             }
         }
@@ -613,7 +614,7 @@ struct ContentView: View {
                 onMessage: { content in
                     DispatchQueue.main.async {
                         if messageIndex < self.messages.count {
-                            typeText(content, messageIndex)
+                            typeText(content, at: messageIndex)
                         }
                     }
                 },
@@ -686,6 +687,7 @@ struct WelcomeView: View {
     @Binding var errorMessage: String?
     let loadChatRecords: () -> Void
     let saveToken: (String) -> Void
+    let selectChatRecord: (String) -> Void
 
     var body: some View {
         ZStack {
@@ -939,7 +941,7 @@ struct ChatView: View {
                 onMessage: { content in
                     DispatchQueue.main.async {
                         if messageIndex < self.messages.count {
-                            typeText(content, messageIndex)
+                            typeText(content, at: messageIndex)
                         }
                     }
                 },
