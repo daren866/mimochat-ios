@@ -408,15 +408,16 @@ struct ContentView: View {
         isLoading = true
         errorMessage = nil
 
-        let handleSendMessage = { [weak self] (convId: String) in
+        let token = mimoToken
+        
+        messages.append(Message(text: "", isUser: false))
+        let messageIndex = messages.count - 1
+        
+        let sendChat = { [weak self] (convId: String) in
             guard let self = self else { return }
             
-            let messageId = UUID().uuidString
-            self.messages.append(Message(text: "", isUser: false))
-            let messageIndex = self.messages.count - 1
-            
             NetworkManager.shared.sendChatMessage(
-                token: self.mimoToken,
+                token: token,
                 message: trimmed,
                 conversationId: convId,
                 onMessage: { content in
@@ -443,19 +444,21 @@ struct ContentView: View {
         }
 
         if let convId = currentConversationId {
-            handleSendMessage(convId)
+            sendChat(convId)
         } else {
             let newConversationId = UUID().uuidString.lowercased()
             NetworkManager.shared.createConversation(
-                token: mimoToken,
+                token: token,
                 conversationId: newConversationId
             ) { [weak self] result in
                 guard let self = self else { return }
                 
                 switch result {
                 case .success(let convId):
-                    self.currentConversationId = convId
-                    handleSendMessage(convId)
+                    DispatchQueue.main.async {
+                        self.currentConversationId = convId
+                        sendChat(convId)
+                    }
                 case .failure(let error):
                     DispatchQueue.main.async {
                         self.isLoading = false
@@ -730,14 +733,16 @@ struct ChatView: View {
         inputText = ""
         isLoading = true
 
-        let handleSendMessage = { [weak self] (convId: String) in
+        let token = mimoToken
+        
+        messages.append(Message(text: "", isUser: false))
+        let messageIndex = messages.count - 1
+        
+        let sendChat = { [weak self] (convId: String) in
             guard let self = self else { return }
             
-            self.messages.append(Message(text: "", isUser: false))
-            let messageIndex = self.messages.count - 1
-            
             NetworkManager.shared.sendChatMessage(
-                token: self.mimoToken,
+                token: token,
                 message: trimmed,
                 conversationId: convId,
                 onMessage: { content in
@@ -764,19 +769,21 @@ struct ChatView: View {
         }
 
         if let convId = currentConversationId {
-            handleSendMessage(convId)
+            sendChat(convId)
         } else {
             let newConversationId = UUID().uuidString.lowercased()
             NetworkManager.shared.createConversation(
-                token: mimoToken,
+                token: token,
                 conversationId: newConversationId
             ) { [weak self] result in
                 guard let self = self else { return }
                 
                 switch result {
                 case .success(let convId):
-                    self.currentConversationId = convId
-                    handleSendMessage(convId)
+                    DispatchQueue.main.async {
+                        self.currentConversationId = convId
+                        sendChat(convId)
+                    }
                 case .failure(let error):
                     DispatchQueue.main.async {
                         self.isLoading = false
