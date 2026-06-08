@@ -483,27 +483,39 @@ class SSESessionDelegate: NSObject, URLSessionDataDelegate {
                 return filterContent(content)
             }
         } catch {
-            print("JSON parse failed: \(error)")
+            print("JSON parse failed: \(error), data: \(dataString.prefix(100))")
         }
         return nil
     }
     
     private func filterContent(_ content: String) -> String {
-        if content == "<think>" {
+        // 过滤控制字符
+        let filtered = content.filter { char in
+            let scalars = char.unicodeScalars
+            for scalar in scalars {
+                if scalar.isASCII && scalar.value < 32 && scalar.value != 9 && scalar.value != 10 && scalar.value != 13 {
+                    return false
+                }
+            }
+            return true
+        }
+        
+        // 过滤 thinking 标签
+        if filtered == "<think>" {
             return ""
         }
-        if content.hasPrefix("<think>") {
-            if let endIndex = content.range(of: "</think>")?.upperBound {
-                return String(content[endIndex...])
+        if filtered.hasPrefix("<think>") {
+            if let endIndex = filtered.range(of: "</think>")?.upperBound {
+                return String(filtered[endIndex...])
             }
             return ""
         }
-        if content.contains("</think>") {
-            if let closeIndex = content.range(of: "</think>")?.upperBound {
-                return String(content[closeIndex...])
+        if filtered.contains("</think>") {
+            if let closeIndex = filtered.range(of: "</think>")?.upperBound {
+                return String(filtered[closeIndex...])
             }
         }
-        return content
+        return filtered
     }
 }
 
