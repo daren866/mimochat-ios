@@ -1,6 +1,6 @@
 import UIKit
 import Speech
-import AVFoundation // 引入语音合成框架
+import AVFoundation
 
 class SiriViewController: UIViewController {
     
@@ -21,7 +21,6 @@ class SiriViewController: UIViewController {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine: AVAudioEngine?
     
-    // 语音合成器
     private let speechSynthesizer = AVSpeechSynthesizer()
     
     private var currentTranscript: String = ""
@@ -44,7 +43,6 @@ class SiriViewController: UIViewController {
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         stopListening()
-        // 退出界面时停止朗读
         if speechSynthesizer.isSpeaking {
             speechSynthesizer.stopSpeaking(at: .immediate)
         }
@@ -182,19 +180,28 @@ class SiriViewController: UIViewController {
     }
     
     private func startListening() {
-        guard let audioEngine = audioEngine, let speechRecognizer = speechRecognizer else { return }
+        guard let audioEngine = audioEngine, let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else { return }
         
-        if !speechRecognizer.isAvailable {
-            print("语音识别不可用")
-            return
-        }
+        // 防止重复启动
+        if isListening { return }
         
-        // 用户开始说话时，如果AI正在朗读，立刻打断（Siri核心交互逻辑）
+        // 先停止之前的任务
+        stopListening()
+        
+        // 用户开始说话时，如果AI正在朗读，立刻打断
         if speechSynthesizer.isSpeaking {
             speechSynthesizer.stopSpeaking(at: .immediate)
         }
         
-        stopListening()
+        // 显式设置音频会话为录音模式，解决与播放冲突的崩溃
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.record, mode: .measurement)
+            try AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("录音音频会话设置失败: \(error)")
+            return
+        }
+        
         currentTranscript = ""
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else { return }
@@ -202,38 +209,53 @@ class SiriViewController: UIViewController {
         
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
+        
+        // 防御性清理：在安装新的 Tap 之前，强制移除可能存在的旧 Tap，防止崩溃
+        inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
             recognitionRequest.append(buffer)
         }
         
+        // 重置引擎状态
+        audioEngine.reset()
         audioEngine.prepare()
+        
         do {
             try audioEngine.start()
             isListening = true
         } catch {
             print("启动音频引擎失败: \(error)")
+            return
         }
         
-        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { result, error in
-            guard let result = result else { return }
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            guard let self = self else { return }
             
-            self.currentTranscript = result.bestTranscription.formattedString
-            
-            if result.isFinal {
-                self.handleRecognitionResult(self.currentTranscript)
+            if let result = result {
+                self.currentTranscript = result.bestTranscription.formattedString
             }
             
-            if error != nil || result.isFinal {
+            if error != nil || result?.isFinal == true {
                 self.stopListening()
+                if result?.isFinal == true {
+                    self.handleRecognitionResult(self.currentTranscript)
+                }
             }
         }
     }
     
     private func stopListening() {
-        recognitionTask?.cancel()
-        recognitionTask = nil
-        audioEngine?.stop()
-        audioEngine?.inputNode.removeTap(onBus: 0)
+        if let recognitionTask = recognitionTask {
+            recognitionTask.cancel()
+            self.recognitionTask = nil
+        }
+        
+        if let audioEngine = audioEngine {
+            audioEngine.stop()
+            // 移除 Tap
+            audioEngine.inputNode.removeTap(onBus: 0)
+        }
+        
         recognitionRequest = nil
         isListening = false
     }
@@ -261,7 +283,8 @@ class SiriViewController: UIViewController {
             if gesture.state == .began {
                 startListening()
                 voiceButton.setTitle("松开发送", for: .normal)
-            } else if gesture.state == .ended {
+            } else if gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed {
+                // 补全手势失败或取消的状态，确保录音能被停止
                 stopListening()
                 handleRecognitionResult(currentTranscript)
                 voiceButton.setTitle("长按输入语音", for: .normal)
@@ -316,23 +339,20 @@ class SiriViewController: UIViewController {
     private func speakText(_ text: String) {
         guard !text.isEmpty else { return }
         
-        // 如果正在朗读，先停止
         if speechSynthesizer.isSpeaking {
             speechSynthesizer.stopSpeaking(at: .immediate)
         }
         
         let utterance = AVSpeechUtterance(string: text)
-        // 设置为中文女声 (zh-CN 默认就是女声)
         utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
-        // 语速：默认语速稍微慢一点点更像Siri，可按需微调 (0.0 - 1.0)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.95
         
-        // 朗读前需要激活音频会话，否则可能和录音冲突导致没声音
+        // 切换音频会话为播放模式，防止与录音冲突崩溃
         do {
             try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: .defaultToSpeaker)
-            try AVAudioSession.sharedInstance().setActive(true)
+            try AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            print("音频会话设置失败: \(error)")
+            print("朗读音频会话设置失败: \(error)")
         }
         
         speechSynthesizer.speak(utterance)
@@ -361,7 +381,6 @@ class SiriViewController: UIViewController {
                 onFinish: {
                     self.isLoading = false
                     self.updateVoiceButtonTitle()
-                    // 网络请求结束，开始朗读完整的回复内容
                     if let responseText = self.aiTextView.text {
                         self.speakText(responseText)
                     }
