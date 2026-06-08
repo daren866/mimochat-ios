@@ -4,22 +4,10 @@ import Speech
 class SiriViewController: UIViewController {
     
     private let backgroundView = UIView()
-    private let contentView = UIView()
+    private let bubbleContainer = UIView()
     private let titleLabel = UILabel()
-    private let userInputHintLabel = UILabel() // 用户输入提示
-    private let subtitleLabel = UILabel() // 修复：添加 subtitleLabel 声明
-    private let settingsButton = UIButton(type: .system)
-    
-    private let chatContainerView = UIView()
-    private let messagesScrollView = UIScrollView()
-    private let messagesStackView = UIStackView()
-    
-    private let inputContainerView = UIView()
-    private let keyboardButton = UIButton(type: .system)
-    private let inputTextField = UITextField()
-    private let sendButton = UIButton(type: .system)
-    
-    private let speakButton = UIButton(type: .system)
+    private let messageBlock = UILabel()
+    private let voiceButton = UIButton(type: .system)
     
     private var messages: [Message] = []
     private var isListening = false
@@ -54,103 +42,57 @@ class SiriViewController: UIViewController {
     }
     
     private func setupUI() {
-        view.backgroundColor = UIColor(white: 0.6, alpha: 1.0)
+        // 设置背景颜色为 #888888
+        view.backgroundColor = UIColor(hex: "#888888")
         
+        // 背景视图（用于点击关闭）
         backgroundView.translatesAutoresizingMaskIntoConstraints = false
-        backgroundView.backgroundColor = UIColor(white: 0.6, alpha: 1.0)
+        backgroundView.backgroundColor = UIColor(hex: "#888888")
         view.addSubview(backgroundView)
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
         backgroundView.addGestureRecognizer(tapGesture)
         
-        contentView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
-        contentView.layer.cornerRadius = 24
-        contentView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        contentView.clipsToBounds = true
-        view.addSubview(contentView)
+        // 气泡容器
+        bubbleContainer.translatesAutoresizingMaskIntoConstraints = false
+        bubbleContainer.backgroundColor = UIColor(hex: "#e0e0e0")
+        bubbleContainer.layer.cornerRadius = 20
+        bubbleContainer.clipsToBounds = true
+        view.addSubview(bubbleContainer)
         
-        // 标题移至左上角
+        // 标题标签 - "你好！"
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text = "Mimo siri"
-        titleLabel.font = UIFont.systemFont(ofSize: 24, weight: .bold)
+        titleLabel.text = "你好！"
+        titleLabel.font = UIFont.systemFont(ofSize: 16)
         titleLabel.textColor = .black
         titleLabel.textAlignment = .left
-        contentView.addSubview(titleLabel)
+        bubbleContainer.addSubview(titleLabel)
         
-        // 用户输入提示
-        userInputHintLabel.translatesAutoresizingMaskIntoConstraints = false
-        userInputHintLabel.text = "用户输入，不支持多行"
-        userInputHintLabel.font = UIFont.systemFont(ofSize: 14)
-        userInputHintLabel.textColor = .gray
-        userInputHintLabel.textAlignment = .left
-        contentView.addSubview(userInputHintLabel)
-        
-        // 修复：subtitleLabel 声明
-        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        subtitleLabel.text = "语音听写已开启"
-        subtitleLabel.font = UIFont.systemFont(ofSize: 16)
-        subtitleLabel.textColor = .gray
-        subtitleLabel.textAlignment = .center
-        contentView.addSubview(subtitleLabel)
-        
-        settingsButton.translatesAutoresizingMaskIntoConstraints = false
-        settingsButton.setImage(UIImage(systemName: "gear"), for: .normal)
-        settingsButton.tintColor = .black
-        settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
-        contentView.addSubview(settingsButton)
+        // 消息文本块
+        messageBlock.translatesAutoresizingMaskIntoConstraints = false
+        messageBlock.text = "我是AI助手哦\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在"
+        messageBlock.font = UIFont.systemFont(ofSize: 20)
+        messageBlock.textColor = .black
+        messageBlock.textAlignment = .left
+        messageBlock.numberOfLines = 0
+        messageBlock.lineBreakMode = .byWordWrapping
+        messageBlock.lineSpacing = 1.5
+        bubbleContainer.addSubview(messageBlock)
         
         // 长按输入语音按钮
-        speakButton.translatesAutoresizingMaskIntoConstraints = false
-        speakButton.setTitle("长按输入语音", for: .normal)
-        speakButton.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
-        speakButton.setTitleColor(.black, for: .normal)
-        speakButton.backgroundColor = .white
-        speakButton.layer.cornerRadius = 30
-        speakButton.layer.borderWidth = 2
-        speakButton.layer.borderColor = UIColor.black.cgColor
-        speakButton.addTarget(self, action: #selector(toggleListening), for: .touchUpInside)
+        voiceButton.translatesAutoresizingMaskIntoConstraints = false
+        voiceButton.setTitle("长按输入语音", for: .normal)
+        voiceButton.titleLabel?.font = UIFont.systemFont(ofSize: 24, weight: .semibold)
+        voiceButton.setTitleColor(.black, for: .normal)
+        voiceButton.backgroundColor = UIColor(hex: "#e0e0e0")
+        voiceButton.layer.cornerRadius = 15
+        voiceButton.layer.borderWidth = 2
+        voiceButton.layer.borderColor = UIColor(hex: "#666666").cgColor
+        voiceButton.addTarget(self, action: #selector(handleLongPress), for: .touchUpInside)
+        bubbleContainer.addSubview(voiceButton)
+        
         // 添加长按手势
         let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
-        speakButton.addGestureRecognizer(longPressGesture)
-        contentView.addSubview(speakButton)
-        
-        chatContainerView.translatesAutoresizingMaskIntoConstraints = false
-        chatContainerView.isHidden = true
-        contentView.addSubview(chatContainerView)
-        
-        messagesScrollView.translatesAutoresizingMaskIntoConstraints = false
-        messagesScrollView.showsVerticalScrollIndicator = false
-        chatContainerView.addSubview(messagesScrollView)
-        
-        messagesStackView.translatesAutoresizingMaskIntoConstraints = false
-        messagesStackView.axis = .vertical
-        messagesStackView.spacing = 12
-        messagesScrollView.addSubview(messagesStackView)
-        
-        inputContainerView.translatesAutoresizingMaskIntoConstraints = false
-        inputContainerView.isHidden = true
-        contentView.addSubview(inputContainerView)
-        
-        keyboardButton.translatesAutoresizingMaskIntoConstraints = false
-        keyboardButton.setImage(UIImage(systemName: "keyboard"), for: .normal)
-        keyboardButton.tintColor = .black
-        keyboardButton.addTarget(self, action: #selector(toggleKeyboardMode), for: .touchUpInside)
-        inputContainerView.addSubview(keyboardButton)
-        
-        inputTextField.translatesAutoresizingMaskIntoConstraints = false
-        inputTextField.placeholder = "输入文本"
-        inputTextField.borderStyle = .roundedRect
-        inputTextField.addTarget(self, action: #selector(textFieldDidReturn), for: .editingDidEndOnExit)
-        inputContainerView.addSubview(inputTextField)
-        
-        sendButton.translatesAutoresizingMaskIntoConstraints = false
-        sendButton.setTitle("发送", for: .normal)
-        sendButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        sendButton.setTitleColor(.white, for: .normal)
-        sendButton.backgroundColor = .blue
-        sendButton.layer.cornerRadius = 8
-        sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
-        inputContainerView.addSubview(sendButton)
+        voiceButton.addGestureRecognizer(longPressGesture)
         
         NSLayoutConstraint.activate([
             backgroundView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -158,74 +100,29 @@ class SiriViewController: UIViewController {
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            contentView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            contentView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
+            // 气泡容器位置：x: 0.05, y: 0.5, width: 0.9, height: 0.45
+            bubbleContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: view.bounds.width * 0.05),
+            bubbleContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -view.bounds.width * 0.05),
+            bubbleContainer.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            bubbleContainer.heightAnchor.constraint(equalTo: view.bounds.height * 0.45),
             
-            // 标题左对齐并添加左侧边距
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            // 标题标签位置：x: 0, y: 0, width: 1, height: 0.1
+            titleLabel.topAnchor.constraint(equalTo: bubbleContainer.topAnchor, constant: 20),
+            titleLabel.leadingAnchor.constraint(equalTo: bubbleContainer.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: bubbleContainer.trailingAnchor, constant: -20),
+            titleLabel.heightAnchor.constraint(equalTo: bubbleContainer.heightAnchor, multiplier: 0.1),
             
-            // 用户输入提示
-            userInputHintLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
-            userInputHintLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            // 消息文本块位置：x: 0, y: 0.12, width: 1, height: 0.68
+            messageBlock.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
+            messageBlock.leadingAnchor.constraint(equalTo: bubbleContainer.leadingAnchor, constant: 20),
+            messageBlock.trailingAnchor.constraint(equalTo: bubbleContainer.trailingAnchor, constant: -20),
+            messageBlock.heightAnchor.constraint(equalTo: bubbleContainer.heightAnchor, multiplier: 0.68),
             
-            // 修复：subtitleLabel 约束
-            subtitleLabel.topAnchor.constraint(equalTo: userInputHintLabel.bottomAnchor, constant: 12),
-            subtitleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            
-            settingsButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            settingsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            settingsButton.widthAnchor.constraint(equalToConstant: 44),
-            settingsButton.heightAnchor.constraint(equalToConstant: 44),
-            
-            // 修复：subtitleLabel 约束
-            speakButton.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 20),
-            speakButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            speakButton.widthAnchor.constraint(equalToConstant: 200),
-            speakButton.heightAnchor.constraint(equalToConstant: 60),
-            speakButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40),
-            
-            keyboardButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            keyboardButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -50),
-            keyboardButton.widthAnchor.constraint(equalToConstant: 36),
-            keyboardButton.heightAnchor.constraint(equalToConstant: 36),
-            
-            chatContainerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            chatContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            chatContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            
-            messagesScrollView.topAnchor.constraint(equalTo: chatContainerView.topAnchor),
-            messagesScrollView.leadingAnchor.constraint(equalTo: chatContainerView.leadingAnchor),
-            messagesScrollView.trailingAnchor.constraint(equalTo: chatContainerView.trailingAnchor),
-            messagesScrollView.bottomAnchor.constraint(equalTo: chatContainerView.bottomAnchor),
-            messagesScrollView.heightAnchor.constraint(equalToConstant: 300),
-            
-            messagesStackView.topAnchor.constraint(equalTo: messagesScrollView.topAnchor),
-            messagesStackView.leadingAnchor.constraint(equalTo: messagesScrollView.leadingAnchor),
-            messagesStackView.trailingAnchor.constraint(equalTo: messagesScrollView.trailingAnchor),
-            messagesStackView.widthAnchor.constraint(equalTo: messagesScrollView.widthAnchor),
-            
-            inputContainerView.topAnchor.constraint(equalTo: chatContainerView.bottomAnchor, constant: 10),
-            inputContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            inputContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            inputContainerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
-            inputContainerView.heightAnchor.constraint(equalToConstant: 50),
-            
-            keyboardButton.centerYAnchor.constraint(equalTo: inputContainerView.centerYAnchor),
-            keyboardButton.leadingAnchor.constraint(equalTo: inputContainerView.leadingAnchor),
-            keyboardButton.widthAnchor.constraint(equalToConstant: 44),
-            
-            inputTextField.centerYAnchor.constraint(equalTo: inputContainerView.centerYAnchor),
-            inputTextField.leadingAnchor.constraint(equalTo: keyboardButton.trailingAnchor, constant: 10),
-            inputTextField.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -10),
-            inputTextField.heightAnchor.constraint(equalToConstant: 36),
-            
-            sendButton.centerYAnchor.constraint(equalTo: inputContainerView.centerYAnchor),
-            sendButton.trailingAnchor.constraint(equalTo: inputContainerView.trailingAnchor),
-            sendButton.widthAnchor.constraint(equalToConstant: 60),
-            sendButton.heightAnchor.constraint(equalToConstant: 36)
+            // 按钮位置：x: 0.05, y: 0.85, width: 0.9, height: 0.15
+            voiceButton.leadingAnchor.constraint(equalTo: bubbleContainer.leadingAnchor, constant: bubbleContainer.bounds.width * 0.05),
+            voiceButton.trailingAnchor.constraint(equalTo: bubbleContainer.trailingAnchor, constant: -bubbleContainer.bounds.width * 0.05),
+            voiceButton.bottomAnchor.constraint(equalTo: bubbleContainer.bottomAnchor, constant: -bubbleContainer.bounds.height * 0.15),
+            voiceButton.heightAnchor.constraint(equalTo: bubbleContainer.heightAnchor, multiplier: 0.15)
         ])
     }
     
@@ -239,9 +136,9 @@ class SiriViewController: UIViewController {
             DispatchQueue.main.async {
                 switch status {
                 case .authorized: print("语音识别权限已授权")
-                case .denied: self?.subtitleLabel.text = "语音识别权限被拒绝" // 修复：使用 subtitleLabel
-                case .restricted: self?.subtitleLabel.text = "语音识别功能受限" // 修复：使用 subtitleLabel
-                case .notDetermined: self?.subtitleLabel.text = "语音识别权限未确定" // 修复：使用 subtitleLabel
+                case .denied: print("语音识别权限被拒绝")
+                case .restricted: print("语音识别功能受限")
+                case .notDetermined: print("语音识别权限未确定")
                 @unknown default: break
                 }
             }
@@ -253,7 +150,7 @@ class SiriViewController: UIViewController {
                     print("麦克风权限已授权")
                     self?.startListening()
                 } else {
-                    self?.subtitleLabel.text = "麦克风权限被拒绝" // 修复：使用 subtitleLabel
+                    print("麦克风权限被拒绝")
                 }
             }
         }
@@ -268,7 +165,7 @@ class SiriViewController: UIViewController {
         }
         
         stopListening()
-        currentTranscript = "" // 每次开始听写前清空上次的记录
+        currentTranscript = ""
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else { return }
         recognitionRequest.shouldReportPartialResults = true
@@ -283,8 +180,7 @@ class SiriViewController: UIViewController {
         do {
             try audioEngine.start()
             isListening = true
-            subtitleLabel.text = "正在听..." // 修复：使用 subtitleLabel
-            speakButton.setTitle("停止", for: .normal)
+            voiceButton.setTitle("停止", for: .normal)
         } catch {
             print("启动音频引擎失败: \(error)")
         }
@@ -293,7 +189,6 @@ class SiriViewController: UIViewController {
             guard let self = self else { return }
             
             if let result = result {
-                // 持续更新最新识别的文本
                 self.currentTranscript = result.bestTranscription.formattedString
                 
                 if result.isFinal {
@@ -314,8 +209,7 @@ class SiriViewController: UIViewController {
         audioEngine?.inputNode.removeTap(onBus: 0)
         recognitionRequest = nil
         isListening = false
-        subtitleLabel.text = "语音听写已开启" // 修复：使用 subtitleLabel
-        speakButton.setTitle("长按输入语音", for: .normal)
+        voiceButton.setTitle("长按输入语音", for: .normal)
     }
     
     private func handleRecognitionResult(_ text: String) {
@@ -332,74 +226,20 @@ class SiriViewController: UIViewController {
     
     private func showChatInterface(isEmptyResult: Bool = false) {
         if isEmptyResult {
-            titleLabel.text = "未听清，请输入"
+            messageBlock.text = "未听清，请输入"
         } else {
-            titleLabel.text = "Mimo siri"
+            messageBlock.text = "我是AI助手哦\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在这是AI恢复，支持多行。AI可以查天气，搜索网络信息，助手\n我在"
         }
         
-        subtitleLabel.isHidden = true // 修复：使用 subtitleLabel
-        speakButton.isHidden = true
-        chatContainerView.isHidden = false
-        inputContainerView.isHidden = false
-        
-        inputTextField.becomeFirstResponder()
+        voiceButton.isHidden = true
+        titleLabel.isHidden = true
     }
     
     private func addMessage(_ text: String, isUser: Bool) {
-        let messageView = UIView()
-        messageView.translatesAutoresizingMaskIntoConstraints = false
-        messageView.layer.cornerRadius = 16
-        messageView.clipsToBounds = true
-        
-        let messageLabel = UILabel()
-        messageLabel.text = text
-        messageLabel.font = UIFont.systemFont(ofSize: 16)
-        messageLabel.numberOfLines = 0
-        messageLabel.lineBreakMode = .byWordWrapping
-        messageLabel.translatesAutoresizingMaskIntoConstraints = false
-        
+        // 在实际应用中，这里会添加用户消息到聊天界面
+        // 由于界面是静态的，这里可能需要更新显示的内容
         if isUser {
-            messageLabel.textColor = .white
-            messageView.backgroundColor = .blue
-        } else {
-            messageLabel.textColor = .black
-            messageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
-        }
-        
-        messageView.addSubview(messageLabel)
-        NSLayoutConstraint.activate([
-            messageLabel.topAnchor.constraint(equalTo: messageView.topAnchor, constant: 12),
-            messageLabel.leadingAnchor.constraint(equalTo: messageView.leadingAnchor, constant: 16),
-            messageLabel.trailingAnchor.constraint(equalTo: messageView.trailingAnchor, constant: -16),
-            messageLabel.bottomAnchor.constraint(equalTo: messageView.bottomAnchor, constant: -12),
-            messageLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 250)
-        ])
-        
-        let container = UIView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(messageView)
-        
-        if isUser {
-            NSLayoutConstraint.activate([
-                messageView.topAnchor.constraint(equalTo: container.topAnchor),
-                messageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                container.heightAnchor.constraint(equalTo: messageView.heightAnchor)
-            ])
-        } else {
-            NSLayoutConstraint.activate([
-                messageView.topAnchor.constraint(equalTo: container.topAnchor),
-                messageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                container.heightAnchor.constraint(equalTo: messageView.heightAnchor)
-            ])
-        }
-        
-        messagesStackView.addArrangedSubview(container)
-        messages.append(Message(text: text, isUser: isUser))
-        
-        DispatchQueue.main.async {
-            self.messagesScrollView.layoutIfNeeded()
-            let bottomOffset = CGPoint(x: 0, y: self.messagesStackView.frame.height - self.messagesScrollView.bounds.height)
-            self.messagesScrollView.setContentOffset(bottomOffset, animated: true)
+            messageBlock.text = text
         }
     }
     
@@ -410,135 +250,20 @@ class SiriViewController: UIViewController {
         }
         
         isLoading = true
-        messages.append(Message(text: "", isUser: false))
         
-        let loadingLabel = UILabel()
-        loadingLabel.text = "..."
-        loadingLabel.font = UIFont.systemFont(ofSize: 16)
-        loadingLabel.textColor = .gray
+        // 在实际应用中，这里会发送消息到服务器
+        // 由于界面是静态的，这里可能需要更新显示的内容
+        addMessage("AI正在处理...", isUser: false)
         
-        let loadingView = UIView()
-        loadingView.translatesAutoresizingMaskIntoConstraints = false
-        loadingView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
-        loadingView.layer.cornerRadius = 16
-        loadingView.addSubview(loadingLabel)
-        
-        NSLayoutConstraint.activate([
-            loadingLabel.topAnchor.constraint(equalTo: loadingView.topAnchor, constant: 12),
-            loadingLabel.leadingAnchor.constraint(equalTo: loadingView.leadingAnchor, constant: 16),
-            loadingLabel.trailingAnchor.constraint(equalTo: loadingView.trailingAnchor, constant: -16),
-            loadingLabel.bottomAnchor.constraint(equalTo: loadingView.bottomAnchor, constant: -12)
-        ])
-        
-        let container = UIView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(loadingView)
-        container.tag = 999
-        
-        NSLayoutConstraint.activate([
-            loadingView.topAnchor.constraint(equalTo: container.topAnchor),
-            loadingView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            container.heightAnchor.constraint(equalTo: loadingView.heightAnchor)
-        ])
-        
-        messagesStackView.addArrangedSubview(container)
-        
-        DispatchQueue.main.async {
-            self.messagesScrollView.layoutIfNeeded()
-            let bottomOffset = CGPoint(x: 0, y: self.messagesStackView.frame.height - self.messagesScrollView.bounds.height)
-            self.messagesScrollView.setContentOffset(bottomOffset, animated: true)
-        }
-        
-        let sendChat = { [weak self] (convId: String) in
-            guard let self = self else { return }
-            NetworkManager.shared.sendChatMessage(
-                token: self.mimoToken,
-                message: text,
-                conversationId: convId,
-                onMessage: { content in
-                    DispatchQueue.main.async {
-                        if let loadingContainer = self.messagesStackView.viewWithTag(999) {
-                            loadingContainer.removeFromSuperview()
-                        }
-                        if self.messages.count > 0 {
-                            self.messages[self.messages.count - 1].text.append(content)
-                            self.updateLastMessage(content)
-                        }
-                    }
-                },
-                onFinish: {
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        if let loadingContainer = self.messagesStackView.viewWithTag(999) {
-                            loadingContainer.removeFromSuperview()
-                        }
-                    }
-                },
-                onError: { error in
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        if let loadingContainer = self.messagesStackView.viewWithTag(999) {
-                            loadingContainer.removeFromSuperview()
-                        }
-                        self.addMessage("请求失败：\(error.localizedDescription)", isUser: false)
-                    }
-                }
-            )
-        }
-        
-        if let convId = currentConversationId {
-            sendChat(convId)
-        } else {
-            let newConversationId = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-            NetworkManager.shared.createConversation(
-                token: mimoToken,
-                conversationId: newConversationId
-            ) { [weak self] result in
-                guard let self = self else { return }
-                switch result {
-                case .success(let convId):
-                    DispatchQueue.main.async {
-                        self.currentConversationId = convId
-                        sendChat(convId)
-                    }
-                case .failure(let error):
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        if let loadingContainer = self.messagesStackView.viewWithTag(999) {
-                            loadingContainer.removeFromSuperview()
-                        }
-                        self.addMessage("创建对话失败：\(error.localizedDescription)", isUser: false)
-                    }
-                }
-            }
-        }
-    }
-    
-    private func updateLastMessage(_ content: String) {
-        if let lastArrangedSubview = messagesStackView.arrangedSubviews.last,
-           let messageView = lastArrangedSubview.subviews.first,
-           let messageLabel = messageView.subviews.first as? UILabel {
-            messageLabel.text = messages.last?.text
-        }
-        
-        DispatchQueue.main.async {
-            self.messagesScrollView.layoutIfNeeded()
-            let bottomOffset = CGPoint(x: 0, y: self.messagesStackView.frame.height - self.messagesScrollView.bounds.height)
-            self.messagesScrollView.setContentOffset(bottomOffset, animated: true)
+        // 模拟AI回复
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            self.addMessage("这是AI的回复内容", isUser: false)
+            self.isLoading = false
         }
     }
     
     @objc private func handleBackgroundTap() {
         dismiss(animated: true)
-    }
-    
-    @objc private func toggleListening() {
-        if isListening {
-            handleRecognitionResult(currentTranscript)
-            stopListening()
-        } else {
-            startListening()
-        }
     }
     
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -548,30 +273,41 @@ class SiriViewController: UIViewController {
             stopListening()
         }
     }
-    
-    @objc private func toggleKeyboardMode() {
-        showChatInterface(isEmptyResult: false)
-    }
-    
-    @objc private func textFieldDidReturn() {
-        sendMessage()
-    }
-    
-    @objc private func sendMessage() {
-        guard let text = inputTextField.text, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        inputTextField.text = ""
-        addMessage(text, isUser: true)
-        sendToMimo(text)
-    }
-    
-    @objc private func openSettings() {
-        dismiss(animated: true)
+}
+
+// UIColor 扩展，支持十六进制颜色
+extension UIColor {
+    convenience init(hex: String) {
+        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
+        
+        var rgb: UInt64 = 0
+        Scanner(string: hexSanitized).scanHexInt64(&rgb)
+        
+        let r = CGFloat((rgb & 0xFF0000) >> 16) / 255.0
+        let g = CGFloat((rgb & 0x00FF00) >> 8) / 255.0
+        let b = CGFloat(rgb & 0x0000FF) / 255.0
+        
+        self.init(red: r, green: g, blue: b, alpha: 1.0)
     }
 }
 
-extension SiriViewController {
-    struct Message {
-        var text: String
-        let isUser: Bool
+extension UILabel {
+    var lineSpacing: CGFloat {
+        get {
+            guard let text = self.text, let font = self.font else { return 0 }
+            let attributedString = NSAttributedString(string: text, attributes: [NSAttributedString.Key.font: font])
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineSpacing = self.lineSpacing
+            let attributedStringWithLineSpacing = NSAttributedString(string: text, attributes: [NSAttributedString.Key.font: font, NSAttributedString.Key.paragraphStyle: paragraphStyle])
+            return paragraphStyle.lineSpacing
+        }
+        set {
+            guard let text = self.text, let font = self.font else { return }
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineSpacing = newValue
+            let attributedString = NSAttributedString(string: text, attributes: [NSAttributedString.Key.font: font, NSAttributedString.Key.paragraphStyle: paragraphStyle])
+            self.attributedText = attributedString
+        }
     }
 }
