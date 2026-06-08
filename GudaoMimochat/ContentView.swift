@@ -566,6 +566,7 @@ struct ContentView: View {
     @State private var showChat = false
     @State private var showSettings = false
     @State private var showChatHistory = false
+    @State private var showSiriMode = false
     @State private var mimoToken = ""
     @State private var chatRecords: [ChatRecord] = []
     @State private var isLoading = false
@@ -573,27 +574,43 @@ struct ContentView: View {
     @State private var errorMessage: String?
     private let tokenKey = "mimoCookieToken"
     private let conversationIdKey = "mimoConversationId"
+    
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("OpenSiriMode"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            self.showSiriMode = true
+        }
+    }
 
     var body: some View {
         Group {
-            if showChat {
-            ChatView(
-                messages: $messages,
-                inputText: $inputText,
-                showSettings: $showSettings,
-                showChatHistory: $showChatHistory,
-                mimoToken: $mimoToken,
-                chatRecords: $chatRecords,
-                isLoading: $isLoading,
-                currentConversationId: $currentConversationId,
-                loadChatRecords: loadChatRecords,
-                saveToken: saveToken,
-                selectChatRecord: selectChatRecord,
-                appendText: appendText,
-                saveConversationId: saveConversationId,
-                deleteAllChatRecords: deleteAllChatRecords
-            )
-        } else {
+            if showSiriMode {
+                SiriModeView(
+                    mimoToken: $mimoToken,
+                    onClose: { showSiriMode = false },
+                    onSend: sendMessage
+                )
+            } else if showChat {
+                ChatView(
+                    messages: $messages,
+                    inputText: $inputText,
+                    showSettings: $showSettings,
+                    showChatHistory: $showChatHistory,
+                    mimoToken: $mimoToken,
+                    chatRecords: $chatRecords,
+                    isLoading: $isLoading,
+                    currentConversationId: $currentConversationId,
+                    loadChatRecords: loadChatRecords,
+                    saveToken: saveToken,
+                    selectChatRecord: selectChatRecord,
+                    appendText: appendText,
+                    saveConversationId: saveConversationId,
+                    deleteAllChatRecords: deleteAllChatRecords
+                )
+            } else {
                 WelcomeView(
                     inputText: $inputText,
                     onSend: sendMessage,
@@ -1583,6 +1600,210 @@ struct TokenInfoRow: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 8)
+    }
+}
+
+// MARK: - SiriModeView
+
+struct SiriModeView: View {
+    @Binding var mimoToken: String
+    let onClose: () -> Void
+    let onSend: () -> Void
+    @State private var isListening = false
+    @State private var recognizedText = ""
+    @State private var showKeyboard = false
+    @State private var messages: [Message] = []
+    @State private var isLoading = false
+    @State private var currentConversationId: String?
+    
+    var body: some View {
+        ZStack {
+            Color.gray.opacity(0.6)
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture {
+                    if !isLoading {
+                        onClose()
+                    }
+                }
+            
+            VStack {
+                if messages.isEmpty {
+                    VStack {
+                        Spacer()
+                        
+                        VStack(spacing: 12) {
+                            Text("有什么问题，请说")
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundColor(.black)
+                            
+                            Text(isListening ? "正在听..." : "语音听写已开启")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        .padding(40)
+                        .background(Color.gray.opacity(0.3))
+                        .cornerRadius(24)
+                        .padding(.horizontal, 30)
+                        
+                        Spacer()
+                    }
+                } else {
+                    VStack(spacing: 0) {
+                        Text("Mimo siri")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                            .padding(.top, 20)
+                            .padding(.horizontal, 20)
+                        
+                        ScrollView {
+                            VStack(spacing: 16) {
+                                ForEach(messages) { message in
+                                    MessageBubble(message: message)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                        }
+                        .frame(maxHeight: 300)
+                        
+                        HStack(spacing: 10) {
+                            Button(action: {
+                                showKeyboard.toggle()
+                            }) {
+                                Image(systemName: "textformat")
+                                    .font(.title)
+                                    .foregroundColor(.black)
+                            }
+                            
+                            if showKeyboard {
+                                HStack {
+                                    TextField("输入文本", text: $recognizedText)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .background(Color.white)
+                                        .cornerRadius(8)
+                                    
+                                    Button(action: sendMessage) {
+                                        Text("发送")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 20)
+                                            .padding(.vertical, 12)
+                                            .background(Color.blue)
+                                            .cornerRadius(8)
+                                    }
+                                    .disabled(isLoading)
+                                }
+                            } else {
+                                Button(action: toggleListening) {
+                                    Text(isListening ? "停止" : "按我说话")
+                                        .font(.title)
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 40)
+                                        .padding(.vertical, 16)
+                                        .background(Color.white)
+                                        .cornerRadius(30)
+                                        .border(Color.black, width: 2)
+                                }
+                                .disabled(isLoading)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 30)
+                    }
+                    .padding(.horizontal, 20)
+                    .background(Color.gray.opacity(0.3))
+                    .cornerRadius(24)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 100)
+                }
+            }
+        }
+        .onAppear {
+            startListening()
+        }
+    }
+    
+    private func startListening() {
+        isListening = true
+    }
+    
+    private func toggleListening() {
+        if isListening {
+            stopListening()
+        } else {
+            startListening()
+        }
+    }
+    
+    private func stopListening() {
+        isListening = false
+    }
+    
+    private func sendMessage() {
+        guard !recognizedText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        
+        messages.append(Message(text: recognizedText, isUser: true))
+        let trimmedText = recognizedText
+        recognizedText = ""
+        isLoading = true
+        
+        messages.append(Message(text: "", isUser: false))
+        let messageIndex = messages.count - 1
+        
+        let token = mimoToken
+        let sendChat = { (convId: String) in
+            NetworkManager.shared.sendChatMessage(
+                token: token,
+                message: trimmedText,
+                conversationId: convId,
+                onMessage: { content in
+                    DispatchQueue.main.async {
+                        if messageIndex < self.messages.count {
+                            self.messages[messageIndex].text.append(content)
+                        }
+                    }
+                },
+                onFinish: {
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                    }
+                },
+                onError: { error in
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        if messageIndex < self.messages.count {
+                            self.messages[messageIndex].text = "请求失败：\(error.localizedDescription)"
+                        }
+                    }
+                }
+            )
+        }
+        
+        if let convId = currentConversationId {
+            sendChat(convId)
+        } else {
+            let newConversationId = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+            NetworkManager.shared.createConversation(
+                token: token,
+                conversationId: newConversationId
+            ) { result in
+                switch result {
+                case .success(let convId):
+                    DispatchQueue.main.async {
+                        self.currentConversationId = convId
+                        sendChat(convId)
+                    }
+                case .failure(let error):
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        self.messages.append(Message(text: "创建对话失败：\(error.localizedDescription)", isUser: false))
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -36,6 +36,17 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>gdmimo</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>gdmimo</string>
+		</dict>
+	</array>
 
 </dict>
 </plist>
