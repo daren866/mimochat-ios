@@ -1434,7 +1434,7 @@ struct MessageBubble: View {
     @State private var showActionSheet = false
     
     var body: some View {
-        HBox(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             if message.isUser {
                 Spacer(minLength: 50)
                 VStack(alignment: .trailing, spacing: 4) {
