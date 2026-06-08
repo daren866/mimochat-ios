@@ -6,7 +6,8 @@ class SiriViewController: UIViewController {
     private let backgroundView = UIView()
     private let contentView = UIView()
     private let titleLabel = UILabel()
-    private let userInputHintLabel = UILabel() // 新增：用户输入提示
+    private let userInputHintLabel = UILabel() // 用户输入提示
+    private let subtitleLabel = UILabel() // 修复：添加 subtitleLabel 声明
     private let settingsButton = UIButton(type: .system)
     
     private let chatContainerView = UIView()
@@ -18,7 +19,7 @@ class SiriViewController: UIViewController {
     private let inputTextField = UITextField()
     private let sendButton = UIButton(type: .system)
     
-    private let speakButton = UIButton(type: .system) // 修改：长按输入语音按钮
+    private let speakButton = UIButton(type: .system)
     
     private var messages: [Message] = []
     private var isListening = false
@@ -30,7 +31,7 @@ class SiriViewController: UIViewController {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine: AVAudioEngine?
     
-    // 新增：用于保存实时识别到的文本
+    // 用于保存实时识别到的文本
     private var currentTranscript: String = ""
     
     private let tokenKey = "mimoCookieToken"
@@ -84,18 +85,19 @@ class SiriViewController: UIViewController {
         userInputHintLabel.textAlignment = .left
         contentView.addSubview(userInputHintLabel)
         
-        settingsButton.translatesAutoresizingMaskIntoConstraints = false
-        settingsButton.setImage(UIImage(systemName: "gear"), for: .normal)
-        settingsButton.tintColor = .black
-        settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
-        contentView.addSubview(settingsButton)
-        
+        // 修复：subtitleLabel 声明
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         subtitleLabel.text = "语音听写已开启"
         subtitleLabel.font = UIFont.systemFont(ofSize: 16)
         subtitleLabel.textColor = .gray
         subtitleLabel.textAlignment = .center
         contentView.addSubview(subtitleLabel)
+        
+        settingsButton.translatesAutoresizingMaskIntoConstraints = false
+        settingsButton.setImage(UIImage(systemName: "gear"), for: .normal)
+        settingsButton.tintColor = .black
+        settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
+        contentView.addSubview(settingsButton)
         
         // 长按输入语音按钮
         speakButton.translatesAutoresizingMaskIntoConstraints = false
@@ -169,14 +171,16 @@ class SiriViewController: UIViewController {
             userInputHintLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
             userInputHintLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             
+            // 修复：subtitleLabel 约束
+            subtitleLabel.topAnchor.constraint(equalTo: userInputHintLabel.bottomAnchor, constant: 12),
+            subtitleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            
             settingsButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             settingsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             settingsButton.widthAnchor.constraint(equalToConstant: 44),
             settingsButton.heightAnchor.constraint(equalToConstant: 44),
             
-            subtitleLabel.topAnchor.constraint(equalTo: userInputHintLabel.bottomAnchor, constant: 12),
-            subtitleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            
+            // 修复：subtitleLabel 约束
             speakButton.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 20),
             speakButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             speakButton.widthAnchor.constraint(equalToConstant: 200),
@@ -235,9 +239,9 @@ class SiriViewController: UIViewController {
             DispatchQueue.main.async {
                 switch status {
                 case .authorized: print("语音识别权限已授权")
-                case .denied: self?.subtitleLabel.text = "语音识别权限被拒绝"
-                case .restricted: self?.subtitleLabel.text = "语音识别功能受限"
-                case .notDetermined: self?.subtitleLabel.text = "语音识别权限未确定"
+                case .denied: self?.subtitleLabel.text = "语音识别权限被拒绝" // 修复：使用 subtitleLabel
+                case .restricted: self?.subtitleLabel.text = "语音识别功能受限" // 修复：使用 subtitleLabel
+                case .notDetermined: self?.subtitleLabel.text = "语音识别权限未确定" // 修复：使用 subtitleLabel
                 @unknown default: break
                 }
             }
@@ -249,7 +253,7 @@ class SiriViewController: UIViewController {
                     print("麦克风权限已授权")
                     self?.startListening()
                 } else {
-                    self?.subtitleLabel.text = "麦克风权限被拒绝"
+                    self?.subtitleLabel.text = "麦克风权限被拒绝" // 修复：使用 subtitleLabel
                 }
             }
         }
@@ -279,7 +283,7 @@ class SiriViewController: UIViewController {
         do {
             try audioEngine.start()
             isListening = true
-            subtitleLabel.text = "正在听..."
+            subtitleLabel.text = "正在听..." // 修复：使用 subtitleLabel
             speakButton.setTitle("停止", for: .normal)
         } catch {
             print("启动音频引擎失败: \(error)")
@@ -310,7 +314,7 @@ class SiriViewController: UIViewController {
         audioEngine?.inputNode.removeTap(onBus: 0)
         recognitionRequest = nil
         isListening = false
-        subtitleLabel.text = "语音听写已开启"
+        subtitleLabel.text = "语音听写已开启" // 修复：使用 subtitleLabel
         speakButton.setTitle("长按输入语音", for: .normal)
     }
     
@@ -333,7 +337,7 @@ class SiriViewController: UIViewController {
             titleLabel.text = "Mimo siri"
         }
         
-        subtitleLabel.isHidden = true
+        subtitleLabel.isHidden = true // 修复：使用 subtitleLabel
         speakButton.isHidden = true
         chatContainerView.isHidden = false
         inputContainerView.isHidden = false
